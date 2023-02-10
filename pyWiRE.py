@@ -238,7 +238,10 @@ class MainWindow(tk.Frame):
             ydata = self.calibrator.ydata[row][col]
             data = np.vstack((xdata.T, ydata.T)).T
             abs_path_raw = os.path.join(self.folder, self.filename_raw.get())
-            abs_path_ref = os.path.join(self.folder, self.filename_ref.get())
+            if self.filename_ref.get() == 'please drag & drop!':
+                abs_path_ref = ''
+            else:
+                abs_path_ref = os.path.join(self.folder, self.filename_ref.get())
             filename = os.path.join(self.folder, f'{str(idx1)}_{str(idx2)}.txt')
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')

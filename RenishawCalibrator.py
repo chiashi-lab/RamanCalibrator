@@ -135,7 +135,7 @@ class RenishawCalibrator:
         x = self.pf.fit_transform(x_raw.reshape(-1, 1))
         self.xdata = np.ravel(self.lr.predict(x))
 
-        self.calibration_info.append([self.material, dimension, self.found_x_ref_true])
+        self.calibration_info += [self.material, dimension, self.found_x_ref_true]
 
     def imshow(self, ax, map_range, cmap):
         img_x0, img_y0 = self.reader_raw.img_origins
