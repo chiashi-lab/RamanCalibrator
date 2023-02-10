@@ -185,16 +185,3 @@ class RenishawCalibrator:
     def idx2coord(self, row, col):
         row, col = self.row2col(row, col)
         return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.7)
-
-
-def main():
-    rc = RenishawCalibrator()
-    # rc.load_raw('/Users/kanedaryoutarou/Library/CloudStorage/GoogleDrive-rkaneda896@g.ecc.u-tokyo.ac.jp/マイドライブ/kaneda/Data_M1/221226/Raman/x50_532_2300.wdf')
-    # rc.load_ref('/Users/kanedaryoutarou/Library/CloudStorage/GoogleDrive-rkaneda896@g.ecc.u-tokyo.ac.jp/マイドライブ/kaneda/Data_M1/221226/Raman/acetonitrile_2300.wdf', 'acetonitrile')
-    rc.load_raw('/Users/kanedaryoutarou/Library/CloudStorage/GoogleDrive-rkaneda896@g.ecc.u-tokyo.ac.jp/マイドライブ/kaneda/Data_M1/221226/Raman/x50_532_1000.wdf')
-    rc.load_ref('/Users/kanedaryoutarou/Library/CloudStorage/GoogleDrive-rkaneda896@g.ecc.u-tokyo.ac.jp/マイドライブ/kaneda/Data_M1/221226/Raman/naphthalene_1000.wdf', 'naphthalene')
-    rc.calibrate(3)
-
-
-if __name__ == '__main__':
-    main()
