@@ -273,7 +273,7 @@ class MainWindow(tk.Frame):
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
-                f.write(f'# Calibration: {self.calibrator.calibration_info}\n\n')
+                f.write(f'# calibration: {self.calibrator.calibration_info}\n\n')
 
                 for x, y in data:
                     f.write(f'{x},{y}\n')
