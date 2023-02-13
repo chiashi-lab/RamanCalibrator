@@ -4,15 +4,23 @@ from tkinter import messagebox
 import numpy as np
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from RenishawCalibrator import RenishawCalibrator
+
+
+rcParams['keymap.back'].remove('left')
+rcParams['keymap.forward'].remove('right')
 
 
 class MainWindow(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
         self.master = master
+        self.width_master = 1250
+        self.height_master = 450
+        self.master.geometry(f'{self.width_master}x{self.height_master}')
 
         self.calibrator = RenishawCalibrator()
         self.ready_to_show = False
@@ -23,17 +31,16 @@ class MainWindow(tk.Frame):
         self.folder = './'
 
         self.create_widgets()
-        self.master.geometry('1250x450')
 
     def create_widgets(self):
         # canvas
-        self.width = 1000
-        self.height = 400
+        self.width_canvas = 1000
+        self.height_canvas = 400
         dpi = 50
         if os.name == 'posix':
-            self.width /= 2
-            self.height /= 2
-        fig, self.ax = plt.subplots(1, 2, figsize=(self.width / dpi, self.height / dpi), dpi=dpi)
+            self.width_canvas /= 2
+            self.height_canvas /= 2
+        fig, self.ax = plt.subplots(1, 2, figsize=(self.width_canvas / dpi, self.height_canvas / dpi), dpi=dpi)
         self.canvas = FigureCanvasTkAgg(fig, self.master)
         self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=3)
         toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
@@ -118,6 +125,13 @@ class MainWindow(tk.Frame):
         self.optionmenu_map_color.grid(row=2, column=0, columnspan=3)
         checkbox_autoscale.grid(row=3, column=0, columnspan=3)
 
+        # canvas_drop
+        self.canvas_drop = tk.Canvas(self.master, width=self.width_master, height=self.height_master)
+        self.canvas_drop.create_rectangle(0, 0, self.width_master, self.height_master / 2, fill='lightgray')
+        self.canvas_drop.create_rectangle(0, self.height_master / 2, self.width_master, self.height_master, fill='gray')
+        self.canvas_drop.create_text(self.width_master / 2, self.height_master / 4, text='2D Map .wdf File', font=('Arial', 30))
+        self.canvas_drop.create_text(self.width_master / 2, self.height_master * 3 / 4, text='Reference .wdf File', font=('Arial', 30))
+
     def calibrate(self):
         self.calibrator.set_material(self.material.get())
         self.calibrator.calibrate(int(self.dimension.get()[0]))
@@ -191,11 +205,18 @@ class MainWindow(tk.Frame):
             self.canvas.draw()
 
     def drop(self, event=None):
+        self.canvas_drop.place_forget()
+
         master_geometry = list(map(int, self.master.winfo_geometry().split('+')[1:]))
-        dropped_place = (event.y_root - master_geometry[1] - 30) / self.height
+        dropped_place = (event.y_root - master_geometry[1] - 30) / self.height_canvas
+
+        if os.name == 'posix':
+            threshold = 1
+        else:
+            threshold = 0.5
 
         filename = [f.replace('{', '').replace('}', '') for f in event.data.split('} {')][0]
-        if dropped_place > 1:  # reference data
+        if dropped_place > threshold:  # reference data
             self.calibrator.load_ref(filename)
             self.filename_ref.set(os.path.split(filename)[-1])
             for material in self.calibrator.database.keys():
@@ -214,6 +235,12 @@ class MainWindow(tk.Frame):
             self.optionmenu_map_color.config(state=tk.ACTIVE)
             self.imshow()
             self.update_plot()
+
+    def drop_enter(self, event):
+        self.canvas_drop.place(anchor='nw', x=0, y=0)
+
+    def drop_leave(self, event):
+        self.canvas_drop.place_forget()
 
     def add(self):
         indices = self.file_to_download.get()
@@ -260,6 +287,8 @@ def main():
     app = MainWindow(master=root)
     root.protocol('WM_DELETE_WINDOW', app.quit)
     root.drop_target_register(DND_FILES)
+    root.dnd_bind('<<DropEnter>>', app.drop_enter)
+    root.dnd_bind('<<DropLeave>>', app.drop_leave)
     root.dnd_bind('<<Drop>>', app.drop)
     app.mainloop()
 
