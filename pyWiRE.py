@@ -92,7 +92,7 @@ class MainWindow(tk.Frame):
         self.button_add_all = tk.Button(frame_download, text='ADD ALL', command=self.add_all)
         self.button_save = tk.Button(frame_download, text='SAVE', command=self.save)
 
-        self.listbox.grid(row=0, column=0, columnspan=2)
+        self.listbox.grid(row=0, column=0, columnspan=3)
         scrollbar.grid(row=0, column=2)
         self.button_add.grid(row=1, column=0)
         self.button_add_all.grid(row=1, column=1)
