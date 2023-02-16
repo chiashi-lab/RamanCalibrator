@@ -89,12 +89,14 @@ class MainWindow(tk.Frame):
         self.listbox.config(yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.listbox.yview)
         self.button_add = tk.Button(frame_download, text='ADD', command=self.add)
+        self.button_add_all = tk.Button(frame_download, text='ADD ALL', command=self.add_all)
         self.button_save = tk.Button(frame_download, text='SAVE', command=self.save)
 
         self.listbox.grid(row=0, column=0, columnspan=2)
         scrollbar.grid(row=0, column=2)
         self.button_add.grid(row=1, column=0)
-        self.button_save.grid(row=1, column=1)
+        self.button_add_all.grid(row=1, column=1)
+        self.button_save.grid(row=1, column=2)
 
         # frame plot
         self.map_range = tk.StringVar(value='G(1570~1610)')
@@ -251,6 +253,10 @@ class MainWindow(tk.Frame):
         index = list(self.calibrator.row2col(self.row, self.col))
         indices.append(index)
         self.file_to_download.set(indices)
+
+    def add_all(self):
+        all_indices = [(idx1, idx2) for idx1 in range(self.calibrator.shape[1]) for idx2 in range(self.calibrator.shape[0])]
+        self.file_to_download.set(all_indices)
 
     def delete(self, event=None):
         if not messagebox.askyesno('Confirmation', 'Delete these?'):
