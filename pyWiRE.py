@@ -255,7 +255,7 @@ class MainWindow(tk.Frame):
         self.file_to_download.set(indices)
 
     def add_all(self):
-        all_indices = [(idx1, idx2) for idx1 in range(self.calibrator.shape[1]) for idx2 in range(self.calibrator.shape[0])]
+        all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in range(self.calibrator.shape[0])]
         self.file_to_download.set(all_indices)
 
     def delete(self, event=None):
