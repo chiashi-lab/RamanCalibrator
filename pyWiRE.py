@@ -9,7 +9,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.backend_bases import key_press_handler
 from RenishawCalibrator import RenishawCalibrator
 
-
 rcParams['keymap.back'].remove('left')
 rcParams['keymap.forward'].remove('right')
 
@@ -82,7 +81,8 @@ class MainWindow(tk.Frame):
 
         # frame_download
         self.file_to_download = tk.Variable(value=[])
-        self.listbox = tk.Listbox(frame_download, listvariable=self.file_to_download, selectmode=tk.MULTIPLE, width=8, height=6, justify=tk.CENTER)
+        self.listbox = tk.Listbox(frame_download, listvariable=self.file_to_download, selectmode=tk.MULTIPLE, width=8,
+                                  height=6, justify=tk.CENTER)
         self.listbox.bind('<Button-2>', self.delete)
         self.listbox.bind('<Button-3>', self.delete)
         scrollbar = tk.Scrollbar(frame_download)
@@ -100,7 +100,8 @@ class MainWindow(tk.Frame):
 
         # frame plot
         self.map_range = tk.StringVar(value='G(1570~1610)')
-        self.optionmenu_map_range = tk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)', command=self.change_map_range)
+        self.optionmenu_map_range = tk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
+                                                  command=self.change_map_range)
         self.optionmenu_map_range.config(state=tk.DISABLED)
         self.map_range_1 = tk.DoubleVar(value=1570)
         self.map_range_2 = tk.DoubleVar(value=1610)
@@ -109,13 +110,13 @@ class MainWindow(tk.Frame):
         self.button_apply = tk.Button(frame_plot, text='APPLY', command=self.imshow, width=7, state=tk.DISABLED)
         self.map_color = tk.StringVar(value='hot')
         self.optionmenu_map_color = tk.OptionMenu(frame_plot, self.map_color,
-                                             *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
-                                             'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
-                                             'gray', 'pink', 'spring', 'summer', 'autumn', 'winter',
-                                             'RdBu', 'Spectral', 'bwr', 'coolwarm', 'hsv', 'twilight',
-                                             'CMRmap', 'cubehelix', 'brg', 'gist_rainbow', 'rainbow',
-                                             'jet', 'nipy_spectral', 'gist_ncar']),
-                                             command=self.imshow)
+                                                  *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
+                                                           'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
+                                                           'gray', 'pink', 'spring', 'summer', 'autumn', 'winter',
+                                                           'RdBu', 'Spectral', 'bwr', 'coolwarm', 'hsv', 'twilight',
+                                                           'CMRmap', 'cubehelix', 'brg', 'gist_rainbow', 'rainbow',
+                                                           'jet', 'nipy_spectral', 'gist_ncar']),
+                                                  command=self.imshow)
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.autoscale = tk.BooleanVar(value=True)
         checkbox_autoscale = tk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
@@ -131,8 +132,10 @@ class MainWindow(tk.Frame):
         self.canvas_drop = tk.Canvas(self.master, width=self.width_master, height=self.height_master)
         self.canvas_drop.create_rectangle(0, 0, self.width_master, self.height_master / 2, fill='lightgray')
         self.canvas_drop.create_rectangle(0, self.height_master / 2, self.width_master, self.height_master, fill='gray')
-        self.canvas_drop.create_text(self.width_master / 2, self.height_master / 4, text='2D Map .wdf File', font=('Arial', 30))
-        self.canvas_drop.create_text(self.width_master / 2, self.height_master * 3 / 4, text='Reference .wdf File', font=('Arial', 30))
+        self.canvas_drop.create_text(self.width_master / 2, self.height_master / 4, text='2D Map .wdf File',
+                                     font=('Arial', 30))
+        self.canvas_drop.create_text(self.width_master / 2, self.height_master * 3 / 4, text='Reference .wdf File',
+                                     font=('Arial', 30))
 
     def calibrate(self):
         self.calibrator.set_material(self.material.get())
@@ -268,7 +271,8 @@ class MainWindow(tk.Frame):
         self.file_to_download.set(indices)
 
     def add_all(self):
-        all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in range(self.calibrator.shape[0])]
+        all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in
+                       range(self.calibrator.shape[0])]
         self.file_to_download.set(all_indices)
 
     def delete(self, event=None):
