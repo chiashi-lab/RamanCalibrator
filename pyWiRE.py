@@ -1,4 +1,5 @@
 import os
+import sys
 import tkinter as tk
 from tkinter import messagebox
 import numpy as np
@@ -289,6 +290,8 @@ class MainWindow(tk.Frame):
 
     def quit(self):
         self.master.quit()
+        self.master.destroy()
+        sys.exit()
 
 
 def main():
