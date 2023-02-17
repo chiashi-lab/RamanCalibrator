@@ -1,7 +1,6 @@
 import os
-import sys
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import numpy as np
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import matplotlib.pyplot as plt
@@ -149,6 +148,8 @@ class MainWindow(tk.Frame):
     def on_click(self, event):
         if event.xdata is None or event.ydata is None:
             return
+        if not self.calibrator.is_inside(event.xdata, event.ydata):
+            return
         self.row, self.col = self.calibrator.coord2idx(event.xdata, event.ydata)
         self.update_plot()
 
@@ -213,6 +214,12 @@ class MainWindow(tk.Frame):
     def drop(self, event=None):
         self.canvas_drop.place_forget()
 
+        filename = event.data.split()[0]
+
+        if filename.split('.')[-1] != 'wdf':
+            messagebox.showerror('Error', 'Only .wdf files are acceptable.')
+            return
+
         master_geometry = list(map(int, self.master.winfo_geometry().split('+')[1:]))
         dropped_place = (event.y_root - master_geometry[1] - 30) / self.height_canvas
 
@@ -221,7 +228,6 @@ class MainWindow(tk.Frame):
         else:
             threshold = 0.5
 
-        filename = [f.replace('{', '').replace('}', '') for f in event.data.split('} {')][0]
         if dropped_place > threshold:  # reference data
             self.calibrator.load_ref(filename)
             self.filename_ref.set(os.path.split(filename)[-1])
@@ -230,7 +236,10 @@ class MainWindow(tk.Frame):
                     self.material.set(material)
             self.button_calibrate.config(state=tk.ACTIVE)
         else:  # raw data
-            self.calibrator.load_raw(filename)
+            ok = self.calibrator.load_raw(filename)
+            if not ok:
+                messagebox.showerror('Error', 'Choose map data.')
+                return
             self.filename_raw.set(os.path.basename(filename))
             self.folder = os.path.dirname(filename)
             self.ready_to_show = True
@@ -269,6 +278,13 @@ class MainWindow(tk.Frame):
             self.listbox.delete(idx)
 
     def save(self):
+        if not self.file_to_download.get():
+            return
+
+        folder_to_save = filedialog.askdirectory(initialdir=self.folder)
+        if not folder_to_save:
+            return
+
         xdata = self.calibrator.xdata
         for i, (idx1, idx2) in enumerate(self.file_to_download.get()):
             row, col = self.calibrator.col2row(idx1, idx2)
@@ -279,7 +295,7 @@ class MainWindow(tk.Frame):
                 abs_path_ref = ''
             else:
                 abs_path_ref = os.path.join(self.folder, self.filename_ref.get())
-            filename = os.path.join(self.folder, f'{str(idx1)}_{str(idx2)}.txt')
+            filename = os.path.join(folder_to_save, f'{str(idx1)}_{str(idx2)}.txt')
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
@@ -291,7 +307,6 @@ class MainWindow(tk.Frame):
     def quit(self):
         self.master.quit()
         self.master.destroy()
-        sys.exit()
 
 
 def main():

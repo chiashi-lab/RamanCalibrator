@@ -21,14 +21,6 @@ def voigt(xval, *params):
     return intensity * model_y + baseline
 
 
-def is_wdf(filename):
-    extension = filename.split('.')[-1]
-    if extension == 'wdf':
-        return True
-    else:
-        return False
-
-
 class RenishawCalibrator:
     def __init__(self):
         with open('./data/reference.json', 'r') as f:
@@ -48,12 +40,11 @@ class RenishawCalibrator:
         self.calibration_info = []
 
     def load_raw(self, filename):
-        if not is_wdf(filename):
-            print('Only .wdf file is acceptable.')
-            return
         self.reader_raw = WDFReader(filename)
-        self.xdata = self.reader_raw.xdata
-        self.ydata = self.reader_raw.spectra
+        self.xdata = self.reader_raw.xdata.copy()
+        self.ydata = self.reader_raw.spectra.copy()
+        if len(self.ydata.shape) != 3:
+            return False
         self.shape = self.ydata.shape[:2]
         self.x_start = self.reader_raw.map_info['x_start']
         self.y_start = self.reader_raw.map_info['y_start']
@@ -61,12 +52,12 @@ class RenishawCalibrator:
         self.y_pad = self.reader_raw.map_info['y_pad']
         self.x_span = self.reader_raw.map_info['x_span']
         self.y_span = self.reader_raw.map_info['y_span']
+        return True
 
     def load_ref(self, filename, material=None):
-        if not is_wdf(filename):
-            print('Only .wdf file is acceptable.')
-            return
         self.reader_ref = WDFReader(filename)
+        if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
+            self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: enable user to choose
         if material is not None:
             self.set_material(material)
 
@@ -105,9 +96,8 @@ class RenishawCalibrator:
             fitted_x_ref.append(popt[0])
             found_x_ref_true.append(x_ref_true)
 
-        # if no peak found
-        if len(fitted_x_ref) == 0:
-            print('Training failed.')
+        # if no peak found or if only one peak found
+        if len(fitted_x_ref) < 2:  # reshape will be failed if there is only one peak
             return False
 
         self.fitted_x_ref = np.array(fitted_x_ref)
@@ -133,7 +123,7 @@ class RenishawCalibrator:
         if not self.find_peaks():
             return False
         self.train(dimension)
-        x_raw = self.reader_raw.xdata
+        x_raw = self.reader_raw.xdata.copy()
         x = self.pf.fit_transform(x_raw.reshape(-1, 1))
         self.xdata = np.ravel(self.lr.predict(x))
 
@@ -172,7 +162,7 @@ class RenishawCalibrator:
 
     def row2col(self, row, col):
         idx = row * self.shape[1] + col
-        # row major
+        # column major
         col = idx // self.shape[0]
         row = idx % self.shape[0]
 
@@ -188,3 +178,9 @@ class RenishawCalibrator:
     def idx2coord(self, row, col):
         row, col = self.row2col(row, col)
         return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.7)
+
+    def is_inside(self, x, y):
+        if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start + self.y_span <= y <= self.y_start):
+            return True
+        else:
+            return False
