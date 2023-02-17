@@ -108,10 +108,11 @@ class RenishawCalibrator:
         # if no peak found
         if len(fitted_x_ref) == 0:
             print('Training failed.')
-            return
+            return False
 
         self.fitted_x_ref = np.array(fitted_x_ref)
         self.found_x_ref_true = np.array(found_x_ref_true)
+        return True
 
     def train(self, dimension: int):
         self.pf = PolynomialFeatures(degree=dimension)
@@ -129,13 +130,15 @@ class RenishawCalibrator:
             plt.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
 
     def calibrate(self, dimension: int):
-        self.find_peaks()
+        if not self.find_peaks():
+            return False
         self.train(dimension)
         x_raw = self.reader_raw.xdata
         x = self.pf.fit_transform(x_raw.reshape(-1, 1))
         self.xdata = np.ravel(self.lr.predict(x))
 
         self.calibration_info += [self.material, dimension, self.found_x_ref_true]
+        return True
 
     def imshow(self, ax, map_range, cmap):
         img_x0, img_y0 = self.reader_raw.img_origins

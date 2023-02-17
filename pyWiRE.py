@@ -136,7 +136,10 @@ class MainWindow(tk.Frame):
 
     def calibrate(self):
         self.calibrator.set_material(self.material.get())
-        self.calibrator.calibrate(int(self.dimension.get()[0]))
+        ok = self.calibrator.calibrate(int(self.dimension.get()[0]))
+        if not ok:
+            messagebox.showerror('Error', 'Peaks not found.')
+            return
         self.ax[1].cla()
         self.calibrator.show_fit_result(self.ax[1])
         self.canvas.draw()
