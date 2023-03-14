@@ -1,6 +1,8 @@
 import os
 import tkinter as tk
 from tkinter import messagebox, filedialog
+
+import matplotlib.backend_bases
 import numpy as np
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import matplotlib.pyplot as plt
@@ -14,7 +16,7 @@ rcParams['keymap.forward'].remove('right')
 
 
 class MainWindow(tk.Frame):
-    def __init__(self, master):
+    def __init__(self, master: tk.Tk) -> None:
         super().__init__(master)
         self.master = master
         self.width_master = 1250
@@ -31,7 +33,7 @@ class MainWindow(tk.Frame):
 
         self.create_widgets()
 
-    def create_widgets(self):
+    def create_widgets(self) -> None:
         # canvas
         self.width_canvas = 1000
         self.height_canvas = 400
@@ -137,7 +139,7 @@ class MainWindow(tk.Frame):
         self.canvas_drop.create_text(self.width_master / 2, self.height_master * 3 / 4, text='Reference .wdf File',
                                      font=('Arial', 30))
 
-    def calibrate(self):
+    def calibrate(self) -> None:
         self.calibrator.set_material(self.material.get())
         ok = self.calibrator.calibrate(int(self.dimension.get()[0]))
         if not ok:
@@ -148,7 +150,7 @@ class MainWindow(tk.Frame):
         self.canvas.draw()
         self.line = None
 
-    def on_click(self, event):
+    def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         if event.xdata is None or event.ydata is None:
             return
         if not self.calibrator.is_inside(event.xdata, event.ydata):
@@ -156,7 +158,7 @@ class MainWindow(tk.Frame):
         self.row, self.col = self.calibrator.coord2idx(event.xdata, event.ydata)
         self.update_plot()
 
-    def key_pressed(self, event):
+    def key_pressed(self, event: matplotlib.backend_bases.KeyEvent) -> None:
         if event.key == 'enter':
             self.imshow()
             return
@@ -174,7 +176,7 @@ class MainWindow(tk.Frame):
         self.row, self.col = self.calibrator.col2row(row, col)
         self.update_plot()
 
-    def change_map_range(self, event=None):
+    def change_map_range(self, event=None) -> None:
         if self.map_range.get() == 'G(1570~1610)':
             self.map_range_1.set(1570)
             self.map_range_2.set(1610)
@@ -183,7 +185,7 @@ class MainWindow(tk.Frame):
             self.map_range_2.set(2750)
         self.imshow()
 
-    def imshow(self, event=None):
+    def imshow(self, event=None) -> None:
         self.ax[0].cla()
         self.horizontal_line = self.ax[0].axhline(color='k', lw=0.8, ls='--')
         self.vertical_line = self.ax[0].axvline(color='k', lw=0.8, ls='--')
@@ -192,7 +194,7 @@ class MainWindow(tk.Frame):
         self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
         self.canvas.draw()
 
-    def update_plot(self):
+    def update_plot(self) -> None:
         x, y = self.calibrator.idx2coord(self.row, self.col)
         self.horizontal_line.set_ydata(y)
         self.vertical_line.set_xdata(x)
@@ -214,7 +216,7 @@ class MainWindow(tk.Frame):
             self.ax[1].legend()
             self.canvas.draw()
 
-    def drop(self, event=None):
+    def drop(self, event: TkinterDnD.DnDEvent=None) -> None:
         self.canvas_drop.place_forget()
 
         filename = event.data.split()[0]
@@ -254,13 +256,13 @@ class MainWindow(tk.Frame):
             self.imshow()
             self.update_plot()
 
-    def drop_enter(self, event):
+    def drop_enter(self, event: TkinterDnD.DnDEvent) -> None:
         self.canvas_drop.place(anchor='nw', x=0, y=0)
 
-    def drop_leave(self, event):
+    def drop_leave(self, event: TkinterDnD.DnDEvent) -> None:
         self.canvas_drop.place_forget()
 
-    def add(self):
+    def add(self) -> None:
         indices = self.file_to_download.get()
         if indices == '':
             indices = []
@@ -270,18 +272,18 @@ class MainWindow(tk.Frame):
         indices.append(index)
         self.file_to_download.set(indices)
 
-    def add_all(self):
+    def add_all(self) -> None:
         all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in
                        range(self.calibrator.shape[0])]
         self.file_to_download.set(all_indices)
 
-    def delete(self, event=None):
+    def delete(self, event=None) -> None:
         if not messagebox.askyesno('Confirmation', 'Delete these?'):
             return
         for idx in sorted(list(self.listbox.curselection()), reverse=True):
             self.listbox.delete(idx)
 
-    def save(self):
+    def save(self) -> None:
         if not self.file_to_download.get():
             return
 
@@ -308,7 +310,7 @@ class MainWindow(tk.Frame):
                 for x, y in data:
                     f.write(f'{x},{y}\n')
 
-    def quit(self):
+    def quit(self) -> None:
         self.master.quit()
         self.master.destroy()
 

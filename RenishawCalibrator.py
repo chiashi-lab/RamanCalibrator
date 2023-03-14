@@ -1,3 +1,4 @@
+from typing import Literal
 import json
 import numpy as np
 from scipy.special import wofz
@@ -10,11 +11,11 @@ import matplotlib.pyplot as plt
 from renishawWiRE import WDFReader
 
 
-def voigt(xval, *params):
+def Voigt(x: np.ndarray, *params: [float]) -> np.ndarray:
     center, intensity, lw, gw, baseline = params
     # lw : HWFM of Lorentzian
     # gw : sigma of Gaussian
-    z = (xval - center + 1j*lw) / (gw * np.sqrt(2.0))
+    z = (x - center + 1j*lw) / (gw * np.sqrt(2.0))
     w = wofz(z)
     model_y = w.real / (gw * np.sqrt(2.0*np.pi))
     intensity /= model_y.max()
@@ -39,7 +40,7 @@ class RenishawCalibrator:
 
         self.calibration_info = []
 
-    def load_raw(self, filename):
+    def load_raw(self, filename: str) -> bool:
         self.reader_raw = WDFReader(filename)
         self.xdata = self.reader_raw.xdata.copy()
         self.ydata = self.reader_raw.spectra.copy()
@@ -54,19 +55,19 @@ class RenishawCalibrator:
         self.y_span = self.reader_raw.map_info['y_span']
         return True
 
-    def load_ref(self, filename, material=None):
+    def load_ref(self, filename: str, material: Literal['sulfur', 'naphthalene', 'acetonitrile']=None) -> None:
         self.reader_ref = WDFReader(filename)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
             self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: enable user to choose
         if material is not None:
             self.set_material(material)
 
-    def set_material(self, material):
+    def set_material(self, material: Literal['sulfur', 'naphthalene', 'acetonitrile']) -> None:
         if material not in ['sulfur', 'naphthalene', 'acetonitrile']:
             raise ValueError('Unsupported material.')
         self.material = material
 
-    def find_peaks(self):
+    def find_peaks(self) -> bool:
         x_ref = self.reader_ref.xdata
         y_ref = self.reader_ref.spectra
 
@@ -91,7 +92,7 @@ class RenishawCalibrator:
             # Fit with Voigt based on the found peak
             p0 = [x_ref_partial[found_peaks[0]], y_ref_partial[found_peaks[0]], 3, 3, y_ref_partial.min()]
 
-            popt, pcov = curve_fit(voigt, x_ref_partial, y_ref_partial, p0=p0)
+            popt, pcov = curve_fit(Voigt, x_ref_partial, y_ref_partial, p0=p0)
 
             fitted_x_ref.append(popt[0])
             found_x_ref_true.append(x_ref_true)
@@ -104,7 +105,7 @@ class RenishawCalibrator:
         self.found_x_ref_true = np.array(found_x_ref_true)
         return True
 
-    def train(self, dimension: int):
+    def train(self, dimension: int) -> None:
         self.pf = PolynomialFeatures(degree=dimension)
         fitted_x_ref_poly = self.pf.fit_transform(self.fitted_x_ref.reshape(-1, 1))
 
@@ -112,14 +113,14 @@ class RenishawCalibrator:
         self.lr = LinearRegression()
         self.lr.fit(fitted_x_ref_poly, np.array(self.found_x_ref_true).reshape(-1, 1))
 
-    def show_fit_result(self, ax):
+    def show_fit_result(self, ax: plt.Axes) -> None:
         ax.plot(self.reader_ref.xdata, self.reader_ref.spectra, color='k')
         ymin, ymax = plt.ylim()
 
         for fitted_x in self.fitted_x_ref:
             plt.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
 
-    def calibrate(self, dimension: int):
+    def calibrate(self, dimension: int) -> bool:
         if not self.find_peaks():
             return False
         self.train(dimension)
@@ -130,14 +131,14 @@ class RenishawCalibrator:
         self.calibration_info += [self.material, dimension, self.found_x_ref_true]
         return True
 
-    def imshow(self, ax, map_range, cmap):
+    def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
         img_x0, img_y0 = self.reader_raw.img_origins
         img_w, img_h = self.reader_raw.img_dimensions
         img = PIL.Image.open(self.reader_raw.img)
         extent = (img_x0, img_x0 + img_w, img_y0 + img_h, img_y0)
 
-        ax.set_xlim([img_x0, img_x0 + img_w])
-        ax.set_ylim([img_y0 + img_h, img_y0])
+        ax.set_xlim(img_x0, img_x0 + img_w)
+        ax.set_ylim(img_y0 + img_h, img_y0)
 
         ax.imshow(img, extent=extent)
 
@@ -152,7 +153,7 @@ class RenishawCalibrator:
 
         ax.imshow(data, alpha=0.9, extent=extent, origin='lower', cmap=cmap)
 
-    def col2row(self, row, col):
+    def col2row(self, row: int, col: int) -> [int, int]:
         idx = col * self.shape[0] + row
         # row major
         row = idx // self.shape[1]
@@ -160,7 +161,7 @@ class RenishawCalibrator:
 
         return row, col
 
-    def row2col(self, row, col):
+    def row2col(self, row: int, col: int) -> [int, int]:
         idx = row * self.shape[1] + col
         # column major
         col = idx // self.shape[0]
@@ -168,18 +169,18 @@ class RenishawCalibrator:
 
         return row, col
 
-    def coord2idx(self, x_pos, y_pos):
+    def coord2idx(self, x_pos: float, y_pos: float) -> [int, int]:
         # column major
         col = int((x_pos - self.x_start) // self.x_pad)
         row = int((y_pos - self.y_start) // self.y_pad)
 
         return self.col2row(row, col)
 
-    def idx2coord(self, row, col):
+    def idx2coord(self, row: int, col: int) -> [float, float]:
         row, col = self.row2col(row, col)
         return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.7)
 
-    def is_inside(self, x, y):
+    def is_inside(self, x: float, y: float) -> bool:
         if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start + self.y_span <= y <= self.y_start):
             return True
         else:
