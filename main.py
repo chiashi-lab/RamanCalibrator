@@ -1,11 +1,10 @@
 import os
 import tkinter as tk
 from tkinter import messagebox, filedialog
-
-import matplotlib.backend_bases
-import numpy as np
 from tkinterdnd2 import TkinterDnD, DND_FILES
+import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.backend_bases
 from matplotlib import rcParams
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
@@ -19,7 +18,7 @@ class MainWindow(tk.Frame):
     def __init__(self, master: tk.Tk) -> None:
         super().__init__(master)
         self.master = master
-        self.width_master = 1250
+        self.width_master = 1350
         self.height_master = 450
         self.master.geometry(f'{self.width_master}x{self.height_master}')
 
@@ -71,6 +70,8 @@ class MainWindow(tk.Frame):
         optionmenu_material = tk.OptionMenu(frame_data, self.material, *self.calibrator.database.keys())
         self.dimension = tk.StringVar(value='1 (Linear)')
         optionmenu_dimension = tk.OptionMenu(frame_data, self.dimension, '1 (Linear)', '2 (Quadratic)', '3 (Cubic)')
+        self.function = tk.StringVar(value='Lorentzian')
+        optionmenu_function = tk.OptionMenu(frame_data, self.function, 'Lorentzian', 'Gaussian', 'Voigt')
         self.button_calibrate = tk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
 
         label_raw.grid(row=0, column=0)
@@ -79,7 +80,8 @@ class MainWindow(tk.Frame):
         self.label_filename_ref.grid(row=1, column=1)
         optionmenu_material.grid(row=2, column=0)
         optionmenu_dimension.grid(row=2, column=1)
-        self.button_calibrate.grid(row=3, column=0, columnspan=2)
+        optionmenu_function.grid(row=2, column=2)
+        self.button_calibrate.grid(row=3, column=0, columnspan=3)
 
         # frame_download
         self.file_to_download = tk.Variable(value=[])
@@ -140,8 +142,8 @@ class MainWindow(tk.Frame):
                                      font=('Arial', 30))
 
     def calibrate(self) -> None:
-        self.calibrator.set_material(self.material.get())
-        ok = self.calibrator.calibrate(int(self.dimension.get()[0]))
+        # self.calibrator.set_material(self.material.get())
+        ok = self.calibrator.calibrate(dimension=int(self.dimension.get()[0]), material=self.material.get(), function=self.function.get())
         if not ok:
             messagebox.showerror('Error', 'Peaks not found.')
             return
@@ -305,7 +307,7 @@ class MainWindow(tk.Frame):
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
-                f.write(f'# calibration: {self.calibrator.calibration_info}\n\n')
+                f.write(f'# calibration: {self.calibrator.base_calibrator.calibration_info}\n\n')
 
                 for x, y in data:
                     f.write(f'{x},{y}\n')

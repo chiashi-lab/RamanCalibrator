@@ -1,25 +1,9 @@
-from typing import Literal
 import json
 import numpy as np
-from scipy.special import wofz
-from scipy.signal import find_peaks
-from scipy.optimize import curve_fit
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
 import PIL
 import matplotlib.pyplot as plt
 from renishawWiRE import WDFReader
-
-
-def Voigt(x: np.ndarray, *params: [float]) -> np.ndarray:
-    center, intensity, lw, gw, baseline = params
-    # lw : HWFM of Lorentzian
-    # gw : sigma of Gaussian
-    z = (x - center + 1j*lw) / (gw * np.sqrt(2.0))
-    w = wofz(z)
-    model_y = w.real / (gw * np.sqrt(2.0*np.pi))
-    intensity /= model_y.max()
-    return intensity * model_y + baseline
+from calibrator import Calibrator
 
 
 class RenishawCalibrator:
@@ -28,17 +12,12 @@ class RenishawCalibrator:
             self.database = json.load(f)
         self.reader_raw: WDFReader = None
         self.reader_ref: WDFReader = None
-        self.material: str = None
-        self.pf: PolynomialFeatures = None
-        self.lr: LinearRegression = None
-
-        self.fitted_x_ref = None
-        self.found_x_ref_true = None
 
         self.xdata: np.ndarray = None
         self.ydata: np.ndarray = None
 
-        self.calibration_info = []
+        self.base_calibrator = Calibrator()
+        self.base_calibrator.set_measurement('Raman')
 
     def load_raw(self, filename: str) -> bool:
         self.reader_raw = WDFReader(filename)
@@ -55,81 +34,27 @@ class RenishawCalibrator:
         self.y_span = self.reader_raw.map_info['y_span']
         return True
 
-    def load_ref(self, filename: str, material: Literal['sulfur', 'naphthalene', 'acetonitrile']=None) -> None:
+    def load_ref(self, filename: str) -> None:
         self.reader_ref = WDFReader(filename)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
-            self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: enable user to choose
-        if material is not None:
-            self.set_material(material)
-
-    def set_material(self, material: Literal['sulfur', 'naphthalene', 'acetonitrile']) -> None:
-        if material not in ['sulfur', 'naphthalene', 'acetonitrile']:
-            raise ValueError('Unsupported material.')
-        self.material = material
-
-    def find_peaks(self) -> bool:
-        x_ref = self.reader_ref.xdata
-        y_ref = self.reader_ref.spectra
-
-        x_ref_true = np.array(self.database[self.material])
-        x_ref_true = x_ref_true[(x_ref_true > x_ref.min()) & (x_ref_true < x_ref.max())]  # crop
-        search_ranges = [[x-15, x+15] for x in x_ref_true]
-
-        fitted_x_ref = []
-        found_x_ref_true = []
-        for x_ref_true, search_range in zip(x_ref_true, search_ranges):
-            # Crop
-            partial = (search_range[0] < x_ref) & (x_ref < search_range[1])
-            x_ref_partial = x_ref[partial]
-            y_ref_partial = y_ref[partial]
-
-            # Begin with finding the maximum position
-            found_peaks, properties = find_peaks(y_ref_partial, prominence=50)
-            if len(found_peaks) != 1:
-                print('Some peaks were not detected.')
-                continue
-
-            # Fit with Voigt based on the found peak
-            p0 = [x_ref_partial[found_peaks[0]], y_ref_partial[found_peaks[0]], 3, 3, y_ref_partial.min()]
-
-            popt, pcov = curve_fit(Voigt, x_ref_partial, y_ref_partial, p0=p0)
-
-            fitted_x_ref.append(popt[0])
-            found_x_ref_true.append(x_ref_true)
-
-        # if no peak found or if only one peak found
-        if len(fitted_x_ref) < 2:  # reshape will be failed if there is only one peak
-            return False
-
-        self.fitted_x_ref = np.array(fitted_x_ref)
-        self.found_x_ref_true = np.array(found_x_ref_true)
-        return True
-
-    def train(self, dimension: int) -> None:
-        self.pf = PolynomialFeatures(degree=dimension)
-        fitted_x_ref_poly = self.pf.fit_transform(self.fitted_x_ref.reshape(-1, 1))
-
-        # Train the linear model
-        self.lr = LinearRegression()
-        self.lr.fit(fitted_x_ref_poly, np.array(self.found_x_ref_true).reshape(-1, 1))
+            self.reader_ref.spectra = self.reader_ref.spectra[0]  # TODO: enable user to choose
+            self.base_calibrator.set_data(self.reader_ref.xdata, self.reader_ref.spectra[0])
+        else:
+            self.base_calibrator.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
     def show_fit_result(self, ax: plt.Axes) -> None:
         ax.plot(self.reader_ref.xdata, self.reader_ref.spectra, color='k')
-        ymin, ymax = plt.ylim()
+        ymin, ymax = ax.get_ylim()
 
-        for fitted_x in self.fitted_x_ref:
-            plt.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
+        # for fitted_x in self.fitted_x_ref:
+        for fitted_x in self.base_calibrator.fitted_x:
+            ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
 
-    def calibrate(self, dimension: int) -> bool:
-        if not self.find_peaks():
-            return False
-        self.train(dimension)
-        x_raw = self.reader_raw.xdata.copy()
-        x = self.pf.fit_transform(x_raw.reshape(-1, 1))
-        self.xdata = np.ravel(self.lr.predict(x))
-
-        self.calibration_info += [self.material, dimension, self.found_x_ref_true]
-        return True
+    def calibrate(self, dimension: int, material: str, function: str) -> bool:
+        self.base_calibrator.set_dimension(dimension)
+        self.base_calibrator.set_material(material)
+        self.base_calibrator.set_function(function)
+        return self.base_calibrator.calibrate()
 
     def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
         img_x0, img_y0 = self.reader_raw.img_origins
