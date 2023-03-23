@@ -8,8 +8,6 @@ from calibrator import Calibrator
 
 class RenishawCalibrator:
     def __init__(self):
-        with open('./data/reference.json', 'r') as f:
-            self.database = json.load(f)
         self.reader_raw: WDFReader = None
         self.reader_ref: WDFReader = None
 
@@ -54,6 +52,7 @@ class RenishawCalibrator:
         self.base_calibrator.set_dimension(dimension)
         self.base_calibrator.set_material(material)
         self.base_calibrator.set_function(function)
+        self.xdata = self.base_calibrator.xdata
         return self.base_calibrator.calibrate()
 
     def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
