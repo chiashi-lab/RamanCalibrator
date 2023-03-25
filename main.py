@@ -66,7 +66,6 @@ class MainWindow(tk.Frame):
         label_ref = tk.Label(frame_data, text='Reference:')
         self.filename_ref = tk.StringVar(value='please drag & drop!')
         self.label_filename_ref = tk.Label(frame_data, textvariable=self.filename_ref)
-        print(self.calibrator.get_material_list())
         self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
         optionmenu_material = tk.OptionMenu(frame_data, self.material, *self.calibrator.get_material_list())
         self.dimension = tk.StringVar(value='1 (Linear)')
