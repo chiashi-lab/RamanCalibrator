@@ -1,4 +1,3 @@
-import json
 import numpy as np
 import PIL
 import matplotlib.pyplot as plt
@@ -6,24 +5,25 @@ from renishawWiRE import WDFReader
 from calibrator import Calibrator
 
 
-class RenishawCalibrator:
-    def __init__(self):
+class RenishawCalibrator(Calibrator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.reader_raw: WDFReader = None
         self.reader_ref: WDFReader = None
 
         self.xdata: np.ndarray = None
-        self.ydata: np.ndarray = None
+        self.ydata: np.ndarray = None  # reference spectrum
+        self.map_data: np.ndarray = None
 
-        self.base_calibrator = Calibrator()
-        self.base_calibrator.set_measurement('Raman')
+        self.set_measurement('Raman')
 
     def load_raw(self, filename: str) -> bool:
         self.reader_raw = WDFReader(filename)
         self.xdata = self.reader_raw.xdata.copy()
-        self.ydata = self.reader_raw.spectra.copy()
-        if len(self.ydata.shape) != 3:
+        self.map_data = self.reader_raw.spectra.copy()
+        if len(self.map_data.shape) != 3:
             return False
-        self.shape = self.ydata.shape[:2]
+        self.shape = self.map_data.shape[:2]
         self.x_start = self.reader_raw.map_info['x_start']
         self.y_start = self.reader_raw.map_info['y_start']
         self.x_pad = self.reader_raw.map_info['x_pad']
@@ -35,25 +35,22 @@ class RenishawCalibrator:
     def load_ref(self, filename: str) -> None:
         self.reader_ref = WDFReader(filename)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
-            self.reader_ref.spectra = self.reader_ref.spectra[0]  # TODO: enable user to choose
-            self.base_calibrator.set_data(self.reader_ref.xdata, self.reader_ref.spectra[0])
-        else:
-            self.base_calibrator.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
+            raise RuntimeWarning('Reference data is supposed to be single measurement, but map data was loaded.')
+            self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
+        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
+
+    def reset_data(self):
+        if self.reader_raw is None or self.reader_ref is None:
+            raise ValueError('Load data before reset.')
+        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
     def show_fit_result(self, ax: plt.Axes) -> None:
-        ax.plot(self.reader_ref.xdata, self.reader_ref.spectra, color='k')
+        ax.plot(self.xdata, self.ydata, color='k')
         ymin, ymax = ax.get_ylim()
 
         # for fitted_x in self.fitted_x_ref:
-        for fitted_x in self.base_calibrator.fitted_x:
+        for fitted_x in self.fitted_x:
             ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
-
-    def calibrate(self, dimension: int, material: str, function: str) -> bool:
-        self.base_calibrator.set_dimension(dimension)
-        self.base_calibrator.set_material(material)
-        self.base_calibrator.set_function(function)
-        self.xdata = self.base_calibrator.xdata
-        return self.base_calibrator.calibrate()
 
     def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
         img_x0, img_y0 = self.reader_raw.img_origins
@@ -69,7 +66,7 @@ class RenishawCalibrator:
         extent = (self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
 
         map_range_idx = (map_range[0] < self.xdata) & (self.xdata < map_range[1])
-        data = self.ydata[:, :, map_range_idx]
+        data = self.map_data[:, :, map_range_idx]
         if data.shape[2] == 0:
             return
         data = data.sum(axis=2) - data.mean(axis=2)

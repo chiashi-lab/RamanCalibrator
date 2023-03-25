@@ -66,12 +66,13 @@ class MainWindow(tk.Frame):
         label_ref = tk.Label(frame_data, text='Reference:')
         self.filename_ref = tk.StringVar(value='please drag & drop!')
         self.label_filename_ref = tk.Label(frame_data, textvariable=self.filename_ref)
-        self.material = tk.StringVar(value=list(self.calibrator.database.keys())[0])
-        optionmenu_material = tk.OptionMenu(frame_data, self.material, *self.calibrator.database.keys())
+        print(self.calibrator.get_material_list())
+        self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
+        optionmenu_material = tk.OptionMenu(frame_data, self.material, *self.calibrator.get_material_list())
         self.dimension = tk.StringVar(value='1 (Linear)')
-        optionmenu_dimension = tk.OptionMenu(frame_data, self.dimension, '1 (Linear)', '2 (Quadratic)', '3 (Cubic)')
+        optionmenu_dimension = tk.OptionMenu(frame_data, self.dimension, *self.calibrator.get_dimension_list())
         self.function = tk.StringVar(value='Lorentzian')
-        optionmenu_function = tk.OptionMenu(frame_data, self.function, 'Lorentzian', 'Gaussian', 'Voigt')
+        optionmenu_function = tk.OptionMenu(frame_data, self.function, *self.calibrator.get_function_list())
         self.button_calibrate = tk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
 
         label_raw.grid(row=0, column=0)
@@ -142,8 +143,11 @@ class MainWindow(tk.Frame):
                                      font=('Arial', 30))
 
     def calibrate(self) -> None:
-        # self.calibrator.set_material(self.material.get())
-        ok = self.calibrator.calibrate(dimension=int(self.dimension.get()[0]), material=self.material.get(), function=self.function.get())
+        self.calibrator.set_dimension(int(self.dimension.get()[0]))
+        self.calibrator.set_material(self.material.get())
+        self.calibrator.set_function(self.function.get())
+        self.calibrator.reset_data()
+        ok = self.calibrator.calibrate()
         if not ok:
             messagebox.showerror('Error', 'Peaks not found.')
             return
@@ -213,7 +217,7 @@ class MainWindow(tk.Frame):
             idx = self.calibrator.row2col(self.row, self.col)
             self.line = self.ax[1].plot(
                 self.calibrator.xdata,
-                self.calibrator.ydata[self.row][self.col],
+                self.calibrator.map_data[self.row][self.col],
                 label=str(idx), color='r', linewidth=0.8)
             self.ax[1].legend()
             self.canvas.draw()
@@ -238,7 +242,7 @@ class MainWindow(tk.Frame):
         if dropped_place > threshold:  # reference data
             self.calibrator.load_ref(filename)
             self.filename_ref.set(os.path.split(filename)[-1])
-            for material in self.calibrator.database.keys():
+            for material in self.calibrator.get_material_list():
                 if material in filename:
                     self.material.set(material)
             self.button_calibrate.config(state=tk.ACTIVE)
@@ -296,8 +300,8 @@ class MainWindow(tk.Frame):
         xdata = self.calibrator.xdata
         for i, (idx1, idx2) in enumerate(self.file_to_download.get()):
             row, col = self.calibrator.col2row(idx1, idx2)
-            ydata = self.calibrator.ydata[row][col]
-            data = np.vstack((xdata.T, ydata.T)).T
+            map_data = self.calibrator.map_data[row][col]
+            data = np.vstack((xdata.T, map_data.T)).T
             abs_path_raw = os.path.join(self.folder, self.filename_raw.get())
             if self.filename_ref.get() == 'please drag & drop!':
                 abs_path_ref = ''
@@ -307,7 +311,7 @@ class MainWindow(tk.Frame):
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
-                f.write(f'# calibration: {self.calibrator.base_calibrator.calibration_info}\n\n')
+                f.write(f'# calibration: {self.calibrator.calibration_info}\n\n')
 
                 for x, y in data:
                     f.write(f'{x},{y}\n')
