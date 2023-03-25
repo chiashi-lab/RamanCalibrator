@@ -11,8 +11,6 @@ class RenishawCalibrator(Calibrator):
         self.reader_raw: WDFReader = None
         self.reader_ref: WDFReader = None
 
-        self.xdata: np.ndarray = None
-        self.ydata: np.ndarray = None  # reference spectrum
         self.map_data: np.ndarray = None
 
         self.set_measurement('Raman')
