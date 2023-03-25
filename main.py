@@ -68,9 +68,9 @@ class MainWindow(tk.Frame):
         self.label_filename_ref = tk.Label(frame_data, textvariable=self.filename_ref)
         self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
         optionmenu_material = tk.OptionMenu(frame_data, self.material, *self.calibrator.get_material_list())
-        self.dimension = tk.StringVar(value='1 (Linear)')
+        self.dimension = tk.StringVar(value=self.calibrator.get_dimension_list()[0])
         optionmenu_dimension = tk.OptionMenu(frame_data, self.dimension, *self.calibrator.get_dimension_list())
-        self.function = tk.StringVar(value='Lorentzian')
+        self.function = tk.StringVar(value=self.calibrator.get_function_list()[0])
         optionmenu_function = tk.OptionMenu(frame_data, self.function, *self.calibrator.get_function_list())
         self.button_calibrate = tk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
 
