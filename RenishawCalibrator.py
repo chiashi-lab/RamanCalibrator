@@ -33,8 +33,8 @@ class RenishawCalibrator(Calibrator):
     def load_ref(self, filename: str) -> None:
         self.reader_ref = WDFReader(filename)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
-            raise RuntimeWarning('Reference data is supposed to be single measurement, but map data was loaded.')
             self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
+            print('Reference data is supposed to be single measurement, but map data was loaded.')
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
     def reset_data(self):
