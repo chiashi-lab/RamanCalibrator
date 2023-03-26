@@ -203,23 +203,26 @@ class MainWindow(tk.Frame):
         x, y = self.calibrator.idx2coord(self.row, self.col)
         self.horizontal_line.set_ydata(y)
         self.vertical_line.set_xdata(x)
-        if 0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]:
-            if self.autoscale.get():
-                plt.autoscale(True)
+
+        if not (0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]):
+            return
+
+        if self.autoscale.get():
+            plt.autoscale(True)
+            self.ax[1].cla()
+        else:
+            if self.line is not None:
+                plt.autoscale(False)  # The very first time requires autoscale
+                self.line[0].remove()
+            else:  # for after calibration
                 self.ax[1].cla()
-            else:
-                if self.line is not None:
-                    plt.autoscale(False)  # The very first time requires autoscale
-                    self.line[0].remove()
-                else:  # for after calibration
-                    self.ax[1].cla()
-            idx = self.calibrator.row2col(self.row, self.col)
-            self.line = self.ax[1].plot(
-                self.calibrator.xdata,
-                self.calibrator.map_data[self.row][self.col],
-                label=str(idx), color='r', linewidth=0.8)
-            self.ax[1].legend()
-            self.canvas.draw()
+        idx = self.calibrator.row2col(self.row, self.col)
+        self.line = self.ax[1].plot(
+            self.calibrator.xdata,
+            self.calibrator.map_data[self.row][self.col],
+            label=str(idx), color='r', linewidth=0.8)
+        self.ax[1].legend()
+        self.canvas.draw()
 
     def drop(self, event: TkinterDnD.DnDEvent=None) -> None:
         self.canvas_drop.place_forget()
