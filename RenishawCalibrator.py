@@ -46,7 +46,6 @@ class RenishawCalibrator(Calibrator):
         ax.plot(self.xdata, self.ydata, color='k')
         ymin, ymax = ax.get_ylim()
 
-        # for fitted_x in self.fitted_x_ref:
         for fitted_x in self.fitted_x:
             ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
 

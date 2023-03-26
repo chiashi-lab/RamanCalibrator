@@ -273,7 +273,9 @@ class MainWindow(tk.Frame):
             indices = []
         else:
             indices = list(indices)
-        index = list(self.calibrator.row2col(self.row, self.col))
+        index = tuple(self.calibrator.row2col(self.row, self.col))
+        if index in indices:  # already exists
+            return
         indices.append(index)
         self.file_to_download.set(indices)
 
@@ -297,10 +299,9 @@ class MainWindow(tk.Frame):
             return
 
         xdata = self.calibrator.xdata
-        for i, (idx1, idx2) in enumerate(self.file_to_download.get()):
+        for idx1, idx2 in self.file_to_download.get():
             row, col = self.calibrator.col2row(idx1, idx2)
-            map_data = self.calibrator.map_data[row][col]
-            data = np.vstack((xdata.T, map_data.T)).T
+            spectrum = self.calibrator.map_data[row][col]
             abs_path_raw = os.path.join(self.folder, self.filename_raw.get())
             if self.filename_ref.get() == 'please drag & drop!':
                 abs_path_ref = ''
@@ -312,7 +313,7 @@ class MainWindow(tk.Frame):
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
                 f.write(f'# calibration: {self.calibrator.calibration_info}\n\n')
 
-                for x, y in data:
+                for x, y in zip(xdata, spectrum):
                     f.write(f'{x},{y}\n')
 
     def quit(self) -> None:
