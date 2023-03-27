@@ -22,7 +22,6 @@ class MainWindow(tk.Frame):
         self.master.geometry(f'{self.width_master}x{self.height_master}')
 
         self.calibrator = RenishawCalibrator()
-        self.ready_to_show = False
         self.row = self.col = 0
 
         self.line = None
@@ -254,9 +253,7 @@ class MainWindow(tk.Frame):
                 return
             self.filename_raw.set(os.path.basename(filename))
             self.folder = os.path.dirname(filename)
-            self.ready_to_show = True
 
-        if self.ready_to_show:
             self.optionmenu_map_range.config(state=tk.ACTIVE)
             self.button_apply.config(state=tk.ACTIVE)
             self.optionmenu_map_color.config(state=tk.ACTIVE)
