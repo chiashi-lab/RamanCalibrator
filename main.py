@@ -2,7 +2,6 @@ import os
 import tkinter as tk
 from tkinter import messagebox, filedialog
 from tkinterdnd2 import TkinterDnD, DND_FILES
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.backend_bases
 from matplotlib import rcParams

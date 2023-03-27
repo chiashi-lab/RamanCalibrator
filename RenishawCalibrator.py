@@ -89,14 +89,14 @@ class RenishawCalibrator(Calibrator):
 
     def coord2idx(self, x_pos: float, y_pos: float) -> [int, int]:
         # column major
-        col = int((x_pos - self.x_start) // self.x_pad)
-        row = int((y_pos - self.y_start) // self.y_pad)
+        col = round((x_pos - self.x_start) // self.x_pad)
+        row = round((y_pos - self.y_start) // self.y_pad)
 
         return self.col2row(row, col)
 
     def idx2coord(self, row: int, col: int) -> [float, float]:
         row, col = self.row2col(row, col)
-        return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.7)
+        return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.5)
 
     def is_inside(self, x: float, y: float) -> bool:
         if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start + self.y_span <= y <= self.y_start):
