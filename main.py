@@ -26,7 +26,8 @@ class MainWindow(tk.Frame):
 
         self.line = None
 
-        self.folder = './'
+        self.folder_raw = './'
+        self.folder_ref = './'
 
         self.create_widgets()
 
@@ -242,6 +243,7 @@ class MainWindow(tk.Frame):
         if dropped_place > threshold:  # reference data
             self.calibrator.load_ref(filename)
             self.filename_ref.set(os.path.split(filename)[-1])
+            self.folder_ref = os.path.dirname(filename)
             for material in self.calibrator.get_material_list():
                 if material in filename:
                     self.material.set(material)
@@ -252,7 +254,7 @@ class MainWindow(tk.Frame):
                 messagebox.showerror('Error', 'Choose map data.')
                 return
             self.filename_raw.set(os.path.basename(filename))
-            self.folder = os.path.dirname(filename)
+            self.folder_raw = os.path.dirname(filename)
 
             self.optionmenu_map_range.config(state=tk.ACTIVE)
             self.button_apply.config(state=tk.ACTIVE)
@@ -293,7 +295,7 @@ class MainWindow(tk.Frame):
         if not self.file_to_download.get():
             return
 
-        folder_to_save = filedialog.askdirectory(initialdir=self.folder)
+        folder_to_save = filedialog.askdirectory(initialdir=self.folder_raw)
         if not folder_to_save:
             return
 
@@ -301,11 +303,11 @@ class MainWindow(tk.Frame):
         for idx1, idx2 in self.file_to_download.get():
             row, col = self.calibrator.col2row(idx1, idx2)
             spectrum = self.calibrator.map_data[row][col]
-            abs_path_raw = os.path.join(self.folder, self.filename_raw.get())
+            abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
             if self.filename_ref.get() == 'please drag & drop!':
                 abs_path_ref = ''
             else:
-                abs_path_ref = os.path.join(self.folder, self.filename_ref.get())
+                abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
             filename = os.path.join(folder_to_save, f'{str(idx1)}_{str(idx2)}.txt')
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
