@@ -226,7 +226,10 @@ class MainWindow(tk.Frame):
     def drop(self, event: TkinterDnD.DnDEvent=None) -> None:
         self.canvas_drop.place_forget()
 
-        filename = event.data.split()[0]
+        if os.name == 'posix':
+            filename = event.data.split()[0]
+        else:
+            filename = event.data.split('} {')[0].strip('{').strip('}')
 
         if filename.split('.')[-1] != 'wdf':
             messagebox.showerror('Error', 'Only .wdf files are acceptable.')
