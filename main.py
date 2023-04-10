@@ -22,7 +22,7 @@ class MainWindow(tk.Frame):
         self.master.geometry(f'{self.width_master}x{self.height_master}')
 
         self.calibrator = RenishawCalibrator()
-        self.ready_to_show = False
+
         self.row = self.col = 0
 
         self.line = None
@@ -63,8 +63,10 @@ class MainWindow(tk.Frame):
         self.filename_raw = tk.StringVar(value='please drag & drop!')
         self.label_filename_raw = tk.Label(frame_data, textvariable=self.filename_raw)
         label_ref = tk.Label(frame_data, text='Reference:')
+        label_ref.bind('<Button-1>', self.show_ref)
         self.filename_ref = tk.StringVar(value='please drag & drop!')
-        self.label_filename_ref = tk.Label(frame_data, textvariable=self.filename_ref)
+        label_filename_ref = tk.Label(frame_data, textvariable=self.filename_ref)
+        label_filename_ref.bind('<Button-1>', self.show_ref)
         self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
         optionmenu_material = tk.OptionMenu(frame_data, self.material, *self.calibrator.get_material_list())
         self.dimension = tk.StringVar(value=self.calibrator.get_dimension_list()[0])
@@ -76,7 +78,7 @@ class MainWindow(tk.Frame):
         label_raw.grid(row=0, column=0)
         self.label_filename_raw.grid(row=0, column=1)
         label_ref.grid(row=1, column=0)
-        self.label_filename_ref.grid(row=1, column=1)
+        label_filename_ref.grid(row=1, column=1)
         optionmenu_material.grid(row=2, column=0)
         optionmenu_dimension.grid(row=2, column=1)
         optionmenu_function.grid(row=2, column=2)
@@ -155,6 +157,8 @@ class MainWindow(tk.Frame):
         self.line = None
 
     def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
+        if self.filename_raw.get() == 'please drag & drop!':
+            return
         if event.xdata is None or event.ydata is None:
             return
         if not self.calibrator.is_inside(event.xdata, event.ydata):
@@ -196,6 +200,22 @@ class MainWindow(tk.Frame):
         self.horizontal_line.set_visible(True)
         self.vertical_line.set_visible(True)
         self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
+        self.canvas.draw()
+
+    def show_ref(self, event=None):
+        if self.filename_ref.get() == 'please drag & drop!':
+            return
+        plt.autoscale(True)
+        if self.line is not None:
+            self.line[0].remove()
+        else:
+            self.ax[1].cla()
+
+        self.line = self.ax[1].plot(
+            self.calibrator.xdata,
+            self.calibrator.ydata,
+            label=self.material.get(), color='k')
+        self.ax[1].legend()
         self.canvas.draw()
 
     def update_plot(self) -> None:
@@ -250,6 +270,7 @@ class MainWindow(tk.Frame):
                 if material in filename:
                     self.material.set(material)
             self.button_calibrate.config(state=tk.ACTIVE)
+            self.show_ref()
         else:  # raw data
             ok = self.calibrator.load_raw(filename)
             if not ok:
@@ -257,9 +278,7 @@ class MainWindow(tk.Frame):
                 return
             self.filename_raw.set(os.path.basename(filename))
             self.folder = os.path.dirname(filename)
-            self.ready_to_show = True
 
-        if self.ready_to_show:
             self.optionmenu_map_range.config(state=tk.ACTIVE)
             self.button_apply.config(state=tk.ACTIVE)
             self.optionmenu_map_color.config(state=tk.ACTIVE)
