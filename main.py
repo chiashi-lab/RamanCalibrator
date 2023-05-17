@@ -166,6 +166,7 @@ class MainWindow(tk.Frame):
         self.line = None
 
     def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
+        # クリックした点のスペクトルを表示する
         if self.filename_raw.get() == 'please drag & drop!':
             return
         if event.xdata is None or event.ydata is None:
@@ -176,9 +177,11 @@ class MainWindow(tk.Frame):
         self.update_plot()
 
     def key_pressed(self, event: matplotlib.backend_bases.KeyEvent) -> None:
+        # 矢印キーで表示するスペクトルを変えられる
         if event.key == 'enter':
             self.imshow()
             return
+        # column majorに変換
         row, col = self.calibrator.row2col(self.row, self.col)
         if event.key == 'up' and row < self.calibrator.shape[0] - 1:
             row += 1
@@ -227,6 +230,7 @@ class MainWindow(tk.Frame):
         self.canvas.draw()
 
     def update_plot(self) -> None:
+        # マッピング上のクロスヘアを移動
         x, y = self.calibrator.idx2coord(self.row, self.col)
         self.horizontal_line.set_ydata(y)
         self.vertical_line.set_xdata(x)
@@ -275,17 +279,23 @@ class MainWindow(tk.Frame):
         self.canvas.draw()
 
     def drop(self, event: TkinterDnD.DnDEvent=None) -> None:
+        # ドラッグ&ドロップされたファイルを処理
+        # 誘導用の長方形を見えないように
         self.canvas_drop.place_forget()
 
+        # パスによって形式が違う
+        # 複数個選択しても1個しか読み込まない
         if event.data[0] == '{':
             filename = event.data.split('} {')[0].strip('{').strip('}')
         else:
             filename = event.data.split()[0]
 
+        # wdfファイルのみ受け付ける
         if filename.split('.')[-1] != 'wdf':
             messagebox.showerror('Error', 'Only .wdf files are acceptable.')
             return
 
+        # どこにdropしたかでマッピングファイルなのか、標準サンプルファイルなのか仕分ける
         master_geometry = list(map(int, self.master.winfo_geometry().split('+')[1:]))
         dropped_place = (event.y_root - master_geometry[1] - 30) / self.height_canvas
 
@@ -323,6 +333,7 @@ class MainWindow(tk.Frame):
         self.canvas_drop.place_forget()
 
     def add(self) -> None:
+        # 保存リストに追加する
         indices = self.file_to_download.get()
         if indices == '':
             indices = []
@@ -337,6 +348,7 @@ class MainWindow(tk.Frame):
         self.update_selection(add_or_delete=True)
 
     def add_all(self) -> None:
+        # 全ての点を保存リストに追加
         all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in
                        range(self.calibrator.shape[0])]
         self.file_to_download.set(all_indices)
@@ -344,6 +356,8 @@ class MainWindow(tk.Frame):
         self.update_selection(add_or_delete=True)
 
     def delete(self, event=None) -> None:
+        # 保存リストから削除
+        # 右クリックから呼ばれた場合、ダイアログを表示
         if event is not None:
             if not messagebox.askyesno('Confirmation', 'Delete these?'):
                 return
@@ -353,13 +367,17 @@ class MainWindow(tk.Frame):
         self.update_selection(add_or_delete=True)
 
     def delete_all(self) -> None:
+        # 保存リストから全て削除
         self.file_to_download.set([])
         self.update_selection(add_or_delete=True)
 
     def save(self) -> None:
+        # 保存リスト内のファイルを保存
         if not self.file_to_download.get():
             return
 
+        # フォルダを選択
+        # ファイル名はスペクトルのインデックスになる
         folder_to_save = filedialog.askdirectory(initialdir=self.folder_raw)
         if not folder_to_save:
             return
