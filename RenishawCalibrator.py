@@ -46,8 +46,14 @@ class RenishawCalibrator(Calibrator):
         ax.plot(self.xdata, self.ydata, color='k')
         ymin, ymax = ax.get_ylim()
 
-        for fitted_x in self.fitted_x:
-            ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
+        for i, (fitted_x, true_x) in enumerate(zip(self.fitted_x, self.found_x_true)):
+            if i == 0:
+                ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1, label='Found peak')
+                ax.vlines(true_x, ymin, ymax, color='b', linewidth=1, label='True value')
+            else:
+                ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
+                ax.vlines(true_x, ymin, ymax, color='b', linewidth=1)
+        ax.legend()
 
     def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
         img_x0, img_y0 = self.reader_raw.img_origins
