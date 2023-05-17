@@ -4,7 +4,7 @@ from tkinter import messagebox, filedialog
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import matplotlib.pyplot as plt
 import matplotlib.backend_bases
-from matplotlib import rcParams
+from matplotlib import rcParams, patches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from RenishawCalibrator import RenishawCalibrator
@@ -17,8 +17,8 @@ class MainWindow(tk.Frame):
     def __init__(self, master: tk.Tk) -> None:
         super().__init__(master)
         self.master = master
-        self.width_master = 1350
-        self.height_master = 450
+        self.width_master = 1600
+        self.height_master = 650
         self.master.geometry(f'{self.width_master}x{self.height_master}')
 
         self.calibrator = RenishawCalibrator()
@@ -26,6 +26,7 @@ class MainWindow(tk.Frame):
         self.row = self.col = 0
 
         self.line = None
+        self.selection_patches = []
 
         self.folder = './'
 
@@ -33,8 +34,8 @@ class MainWindow(tk.Frame):
 
     def create_widgets(self) -> None:
         # canvas
-        self.width_canvas = 1000
-        self.height_canvas = 400
+        self.width_canvas = 1200
+        self.height_canvas = 600
         dpi = 50
         if os.name == 'posix':
             self.width_canvas /= 2
@@ -94,14 +95,21 @@ class MainWindow(tk.Frame):
         self.listbox.config(yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.listbox.yview)
         self.button_add = tk.Button(frame_download, text='ADD', command=self.add)
+        self.button_delete = tk.Button(frame_download, text='DELETE', command=self.delete)
         self.button_add_all = tk.Button(frame_download, text='ADD ALL', command=self.add_all)
+        self.button_delete_all = tk.Button(frame_download, text='DELETE ALL', command=self.delete_all)
         self.button_save = tk.Button(frame_download, text='SAVE', command=self.save)
+        self.show_selection_in_map = tk.BooleanVar(value=True)
+        checkbox_show_selection_in_map = tk.Checkbutton(frame_download, text='Show in Map', variable=self.show_selection_in_map, command=self.update_selection)
 
         self.listbox.grid(row=0, column=0, columnspan=3)
         scrollbar.grid(row=0, column=2)
         self.button_add.grid(row=1, column=0)
+        self.button_delete.grid(row=2, column=0)
         self.button_add_all.grid(row=1, column=1)
-        self.button_save.grid(row=1, column=2)
+        self.button_delete_all.grid(row=2, column=1)
+        self.button_save.grid(row=1, column=2, rowspan=2)
+        checkbox_show_selection_in_map.grid(row=3, column=0, columnspan=3)
 
         # frame plot
         self.map_range = tk.StringVar(value='G(1570~1610)')
@@ -195,11 +203,10 @@ class MainWindow(tk.Frame):
 
     def imshow(self, event=None) -> None:
         self.ax[0].cla()
-        self.horizontal_line = self.ax[0].axhline(color='k', lw=0.8, ls='--')
-        self.vertical_line = self.ax[0].axvline(color='k', lw=0.8, ls='--')
-        self.horizontal_line.set_visible(True)
-        self.vertical_line.set_visible(True)
+        self.horizontal_line = self.ax[0].axhline(color='k', lw=1, ls='--')
+        self.vertical_line = self.ax[0].axvline(color='k', lw=1, ls='--')
         self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
+        self.update_selection()
         self.canvas.draw()
 
     def show_ref(self, event=None):
@@ -241,6 +248,29 @@ class MainWindow(tk.Frame):
             self.calibrator.map_data[self.row][self.col],
             label=str(idx), color='r', linewidth=0.8)
         self.ax[1].legend()
+        self.canvas.draw()
+
+    def update_selection(self, add_or_delete=False):
+        if add_or_delete:
+            # patchesも対応するように更新
+            for r in self.selection_patches:
+                r.remove()
+            self.selection_patches = []
+            for idx1, idx2 in self.file_to_download.get():
+                row, col = self.calibrator.col2row(idx1, idx2)
+                x, y = self.calibrator.idx2coord(row, col)
+                x1 = x - self.calibrator.x_pad / 2
+                y1 = y - self.calibrator.y_pad / 2
+                r = patches.Rectangle((x1, y1), self.calibrator.x_pad, self.calibrator.y_pad, fill=False, edgecolor='white', lw=1)
+                self.ax[0].add_patch(r)
+                self.selection_patches.append(r)
+
+        if not self.show_selection_in_map.get():
+            for r in self.selection_patches:
+                r.set_visible(False)
+        else:
+            for r in self.selection_patches:
+                r.set_visible(True)
         self.canvas.draw()
 
     def drop(self, event: TkinterDnD.DnDEvent=None) -> None:
@@ -303,16 +333,27 @@ class MainWindow(tk.Frame):
         indices.append(index)
         self.file_to_download.set(indices)
 
+        self.update_selection(add_or_delete=True)
+
     def add_all(self) -> None:
         all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in
                        range(self.calibrator.shape[0])]
         self.file_to_download.set(all_indices)
 
+        self.update_selection(add_or_delete=True)
+
     def delete(self, event=None) -> None:
-        if not messagebox.askyesno('Confirmation', 'Delete these?'):
-            return
+        if event is not None:
+            if not messagebox.askyesno('Confirmation', 'Delete these?'):
+                return
         for idx in sorted(list(self.listbox.curselection()), reverse=True):
             self.listbox.delete(idx)
+
+        self.update_selection(add_or_delete=True)
+
+    def delete_all(self) -> None:
+        self.file_to_download.set([])
+        self.update_selection(add_or_delete=True)
 
     def save(self) -> None:
         if not self.file_to_download.get():
