@@ -49,21 +49,6 @@ class RenishawCalibrator(Calibrator):
             raise ValueError('Load data before reset.')
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
-    def show_fit_result(self, ax: plt.Axes) -> None:
-        # 標準サンプルのピークのフィッティングの結果を表示
-        # 較正前のピーク位置、較正後のピーク位置を示す
-        ax.plot(self.xdata, self.ydata, color='k')
-        ymin, ymax = ax.get_ylim()
-
-        for i, (fitted_x, true_x) in enumerate(zip(self.fitted_x, self.found_x_true)):
-            if i == 0:
-                ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1, label='Found peak')
-                ax.vlines(true_x, ymin, ymax, color='b', linewidth=1, label='True value')
-            else:
-                ax.vlines(fitted_x, ymin, ymax, color='r', linewidth=1)
-                ax.vlines(true_x, ymin, ymax, color='b', linewidth=1)
-        ax.legend()
-
     def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
         # マッピングの表示
         # 光学像の位置、サイズを取り出す
