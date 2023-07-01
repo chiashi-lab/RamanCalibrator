@@ -306,7 +306,8 @@ class MainWindow(tk.Frame):
 
         if dropped_place > threshold:  # reference data
             self.calibrator.load_ref(filename)
-            self.filename_ref.set(os.path.split(filename)[-1])
+            self.filename_ref.set(os.path.basename(filename))
+            self.folder_ref = os.path.dirname(filename)
             for material in self.calibrator.get_material_list():
                 if material in filename:
                     self.material.set(material)
