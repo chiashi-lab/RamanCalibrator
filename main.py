@@ -20,6 +20,7 @@ class MainWindow(tk.Frame):
         self.width_master = 1600
         self.height_master = 650
         self.master.geometry(f'{self.width_master}x{self.height_master}')
+        self.master.title('Renishaw Calibrator')
 
         self.calibrator = RenishawCalibrator()
 
