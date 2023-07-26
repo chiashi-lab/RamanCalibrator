@@ -4,6 +4,12 @@ import matplotlib.pyplot as plt
 from renishawWiRE import WDFReader
 from calibrator import Calibrator
 
+
+def subtract_baseline(data: np.ndarray):
+    baseline = np.linspace(data[0], data[-1], data.shape[0])
+    return data - baseline
+
+
 # Calibratorは自作ライブラリ。Rayleigh, Raman用のデータとフィッティングの関数等が含まれている。
 class RenishawCalibrator(Calibrator):
     def __init__(self, *args, **kwargs):
@@ -66,7 +72,7 @@ class RenishawCalibrator(Calibrator):
         data = self.map_data[:, :, map_range_idx]
         if data.shape[2] == 0:
             return
-        data = data.sum(axis=2) - data.mean(axis=2)
+        data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
         data = data.reshape(data.shape[::-1]).T
         # 光学像の上にマッピングを描画
         ax.imshow(data, alpha=0.9, extent=extent_mapping, origin='lower', cmap=cmap)
