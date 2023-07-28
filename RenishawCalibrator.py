@@ -21,6 +21,11 @@ class RenishawCalibrator(Calibrator):
 
         self.set_measurement('Raman')
 
+    def reset(self):
+        self.reader_raw = None
+        self.reader_ref = None
+        self.map_data = None
+
     def load_raw(self, filename: str) -> bool:
         # 二次元マッピングファイルを読み込む
         self.reader_raw = WDFReader(filename)
@@ -56,6 +61,8 @@ class RenishawCalibrator(Calibrator):
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
     def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
+        if self.reader_raw is None:
+            raise ValueError('Load data before imshow.')
         # マッピングの表示
         # 光学像の位置、サイズを取り出す
         img_x0, img_y0 = self.reader_raw.img_origins

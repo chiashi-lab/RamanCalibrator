@@ -210,9 +210,12 @@ class MainWindow(tk.Frame):
         self.ax[0].cla()
         self.horizontal_line = self.ax[0].axhline(color='k', lw=1, ls='--')
         self.vertical_line = self.ax[0].axvline(color='k', lw=1, ls='--')
-        self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
+        try:
+            self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
+        except ValueError:
+            print('ValueError')
+            return
         self.update_selection()
-        self.canvas.draw()
 
     def show_ref(self, event=None):
         if self.filename_ref.get() == 'please drag & drop!':
@@ -315,6 +318,7 @@ class MainWindow(tk.Frame):
             self.button_calibrate.config(state=tk.ACTIVE)
             self.show_ref()
         else:  # raw data
+            self.reset()
             ok = self.calibrator.load_raw(filename)
             if not ok:
                 messagebox.showerror('Error', 'Choose map data.')
@@ -333,6 +337,22 @@ class MainWindow(tk.Frame):
 
     def drop_leave(self, event: TkinterDnD.DnDEvent) -> None:
         self.canvas_drop.place_forget()
+
+    def reset(self) -> None:
+        # マッピングデータのリセット
+        self.calibrator.reset()
+        self.filename_raw.set('')
+        self.filename_ref.set('')
+        self.folder_raw = './'
+        self.folder_ref = './'
+        self.button_calibrate.config(state=tk.DISABLED)
+        self.button_apply.config(state=tk.DISABLED)
+        self.optionmenu_map_range.config(state=tk.DISABLED)
+        self.optionmenu_map_color.config(state=tk.DISABLED)
+        self.row = 0
+        self.col = 0
+        self.imshow()
+        self.update_plot()
 
     def add(self) -> None:
         # 保存リストに追加する
