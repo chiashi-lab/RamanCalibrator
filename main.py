@@ -212,10 +212,9 @@ class MainWindow(tk.Frame):
         self.vertical_line = self.ax[0].axvline(color='k', lw=1, ls='--')
         try:
             self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
+            self.update_selection()
         except ValueError:
             print('ValueError')
-            return
-        self.update_selection()
 
     def show_ref(self, event=None):
         if self.filename_ref.get() == 'please drag & drop!':
@@ -351,8 +350,6 @@ class MainWindow(tk.Frame):
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.row = 0
         self.col = 0
-        self.imshow()
-        self.update_plot()
 
     def add(self) -> None:
         # 保存リストに追加する
