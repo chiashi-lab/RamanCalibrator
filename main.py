@@ -8,6 +8,7 @@ from matplotlib import rcParams, patches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from RenishawCalibrator import RenishawCalibrator
+from MyTooltip import MyTooltip
 
 font_lg = ('Arial', 24)
 font_md = ('Arial', 16)
@@ -99,6 +100,8 @@ class MainWindow(tk.Frame):
         self.filename_ref = tk.StringVar(value='please drag & drop!')
         label_filename_raw = ttk.Label(frame_data, textvariable=self.filename_raw)
         label_filename_ref = ttk.Label(frame_data, textvariable=self.filename_ref)
+        self.tooltip_raw = MyTooltip(label_filename_raw, '')
+        self.tooltip_ref = MyTooltip(label_filename_ref, '')
         label_ref.bind('<Button-1>', self.show_ref)
         label_filename_ref.bind('<Button-1>', self.show_ref)
         self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
@@ -139,13 +142,12 @@ class MainWindow(tk.Frame):
         self.button_save = ttk.Button(frame_download, text='SAVE', command=self.save, takefocus=False)
         self.show_selection_in_map = tk.BooleanVar(value=True)
         checkbox_show_selection_in_map = ttk.Checkbutton(frame_download, text='Show in Map', variable=self.show_selection_in_map, command=self.update_selection)
-        # self.listbox.grid(row=0, column=0, columnspan=3)
         self.treeview.grid(row=0, column=0, columnspan=3)
         self.button_add.grid(row=1, column=0)
         self.button_delete.grid(row=2, column=0)
         self.button_add_all.grid(row=1, column=1)
         self.button_delete_all.grid(row=2, column=1)
-        self.button_save.grid(row=1, column=2, rowspan=2)
+        self.button_save.grid(row=1, column=2, rowspan=2, sticky=tk.NS)
         checkbox_show_selection_in_map.grid(row=3, column=0, columnspan=3)
 
         # frame plot
@@ -171,11 +173,11 @@ class MainWindow(tk.Frame):
         self.optionmenu_map_color['menu'].config(font=font_md)
         self.autoscale = tk.BooleanVar(value=True)
         checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
-        self.optionmenu_map_range.grid(row=0, column=0, columnspan=3)
+        self.optionmenu_map_range.grid(row=0, column=0, columnspan=2, sticky=tk.EW)
         entry_map_range_1.grid(row=1, column=0)
         entry_map_range_2.grid(row=1, column=1)
-        self.button_apply.grid(row=1, column=2)
-        self.optionmenu_map_color.grid(row=2, column=0, columnspan=3)
+        self.button_apply.grid(row=0, column=2, rowspan=3, sticky=tk.NS)
+        self.optionmenu_map_color.grid(row=2, column=0, columnspan=2, sticky=tk.EW)
         checkbox_autoscale.grid(row=3, column=0, columnspan=3)
 
         # canvas_drop
@@ -356,6 +358,7 @@ class MainWindow(tk.Frame):
                     self.material.set(material)
             self.button_calibrate.config(state=tk.ACTIVE)
             self.show_ref()
+            self.tooltip_ref.set(filename)
         else:  # raw data
             self.reset()
             ok = self.calibrator.load_raw(filename)
@@ -370,6 +373,7 @@ class MainWindow(tk.Frame):
             self.optionmenu_map_color.config(state=tk.ACTIVE)
             self.imshow()
             self.update_plot()
+            self.tooltip_raw.set(filename)
 
     def drop_enter(self, event: TkinterDnD.DnDEvent) -> None:
         self.canvas_drop.place(anchor='nw', x=0, y=0)
@@ -380,8 +384,8 @@ class MainWindow(tk.Frame):
     def reset(self) -> None:
         # マッピングデータのリセット
         self.calibrator.reset()
-        self.filename_raw.set('')
-        self.filename_ref.set('')
+        self.filename_raw.set('please drag & drop!')
+        self.filename_ref.set('please drag & drop!')
         self.folder_raw = './'
         self.folder_ref = './'
         self.button_calibrate.config(state=tk.DISABLED)
@@ -390,6 +394,7 @@ class MainWindow(tk.Frame):
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.row = 0
         self.col = 0
+        self.treeview.delete(*self.treeview.get_children())
 
     @check_loaded
     def add(self) -> None:
