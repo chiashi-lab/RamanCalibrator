@@ -26,6 +26,8 @@ class MainWindow(tk.Frame):
 
         self.row = self.col = 0
 
+        self.ax: list[plt.Axes] = []
+
         self.line = None
         self.selection_patches = []
 
@@ -258,20 +260,18 @@ class MainWindow(tk.Frame):
         self.ax[1].legend()
         self.canvas.draw()
 
-    def update_selection(self, add_or_delete=False):
-        if add_or_delete:
-            # patchesも対応するように更新
-            for r in self.selection_patches:
-                r.remove()
-            self.selection_patches = []
-            for idx1, idx2 in self.file_to_download.get():
-                row, col = self.calibrator.col2row(idx1, idx2)
-                x, y = self.calibrator.idx2coord(row, col)
-                x1 = x - self.calibrator.x_pad / 2
-                y1 = y - self.calibrator.y_pad / 2
-                r = patches.Rectangle((x1, y1), self.calibrator.x_pad, self.calibrator.y_pad, fill=False, edgecolor='white', lw=1)
-                self.ax[0].add_patch(r)
-                self.selection_patches.append(r)
+    def update_selection(self):
+        for r in self.selection_patches:
+            r.remove()
+        self.selection_patches = []
+        for idx1, idx2 in self.file_to_download.get():
+            row, col = self.calibrator.col2row(idx1, idx2)
+            x, y = self.calibrator.idx2coord(row, col)
+            x1 = x - self.calibrator.x_pad / 2
+            y1 = y - self.calibrator.y_pad / 2
+            r = patches.Rectangle((x1, y1), self.calibrator.x_pad, self.calibrator.y_pad, fill=False, edgecolor='white', lw=1)
+            self.ax[0].add_patch(r)
+            self.selection_patches.append(r)
 
         if not self.show_selection_in_map.get():
             for r in self.selection_patches:
@@ -281,7 +281,7 @@ class MainWindow(tk.Frame):
                 r.set_visible(True)
         self.canvas.draw()
 
-    def drop(self, event: TkinterDnD.DnDEvent=None) -> None:
+    def drop(self, event: TkinterDnD.DnDEvent) -> None:
         # ドラッグ&ドロップされたファイルを処理
         # 誘導用の長方形を見えないように
         self.canvas_drop.place_forget()
@@ -364,7 +364,7 @@ class MainWindow(tk.Frame):
         indices.append(index)
         self.file_to_download.set(indices)
 
-        self.update_selection(add_or_delete=True)
+        self.update_selection()
 
     def add_all(self) -> None:
         # 全ての点を保存リストに追加
@@ -372,23 +372,30 @@ class MainWindow(tk.Frame):
                        range(self.calibrator.shape[0])]
         self.file_to_download.set(all_indices)
 
-        self.update_selection(add_or_delete=True)
+        self.update_selection()
 
     def delete(self, event=None) -> None:
+        # TODO: Treeviewに変更したら処理が楽になる
         # 保存リストから削除
         # 右クリックから呼ばれた場合、ダイアログを表示
         if event is not None:
             if not messagebox.askyesno('Confirmation', 'Delete these?'):
                 return
-        for idx in sorted(list(self.listbox.curselection()), reverse=True):
+
+        idx_to_delete = list(self.listbox.curselection())
+        # 何も選択されていない場合、現在の点を削除
+        if len(idx_to_delete) == 0:
+            idx_to_delete = [self.file_to_download.get().index(tuple(self.calibrator.row2col(self.row, self.col)))]
+
+        for idx in sorted(idx_to_delete, reverse=True):
             self.listbox.delete(idx)
 
-        self.update_selection(add_or_delete=True)
+        self.update_selection()
 
     def delete_all(self) -> None:
         # 保存リストから全て削除
         self.file_to_download.set([])
-        self.update_selection(add_or_delete=True)
+        self.update_selection()
 
     def save(self) -> None:
         # 保存リスト内のファイルを保存
