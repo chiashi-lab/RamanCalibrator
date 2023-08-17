@@ -1,6 +1,6 @@
 import os
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, ttk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import matplotlib.pyplot as plt
 import matplotlib.backend_bases
@@ -8,6 +8,10 @@ from matplotlib import rcParams, patches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from RenishawCalibrator import RenishawCalibrator
+
+font_lg = ('Arial', 24)
+font_md = ('Arial', 16)
+font_sm = ('Arial', 12)
 
 rcParams['keymap.back'].remove('left')
 rcParams['keymap.forward'].remove('right')
@@ -17,7 +21,7 @@ class MainWindow(tk.Frame):
     def __init__(self, master: tk.Tk) -> None:
         super().__init__(master)
         self.master = master
-        self.width_master = 1600
+        self.width_master = 1800
         self.height_master = 650
         self.master.geometry(f'{self.width_master}x{self.height_master}')
         self.master.title('Renishaw Calibrator')
@@ -37,6 +41,16 @@ class MainWindow(tk.Frame):
         self.create_widgets()
 
     def create_widgets(self) -> None:
+        style = ttk.Style()
+        style.theme_use('winnative')
+        style.configure('TButton', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='black')
+        style.configure('R.TButton', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='red')
+        style.configure('TLabel', font=font_sm, padding=[0, 4, 0, 4], foreground='black')
+        style.configure('Color.TLabel', font=font_lg, padding=[0, 0, 0, 0], width=4, background='black')
+        style.configure('TEntry', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='black')
+        style.configure('TCheckbutton', font=font_md, padding=[0, 4, 0, 4], foreground='black')
+        style.configure('TMenubutton', font=font_md, foreground='black')
+        style.configure('TListbox', font=font_md, foreground='black')
         # canvas
         self.width_canvas = 1200
         self.height_canvas = 600
@@ -56,34 +70,36 @@ class MainWindow(tk.Frame):
         self.canvas.mpl_connect('key_press_event', key_press_handler)
 
         # frames
-        frame_data = tk.LabelFrame(self.master, text='Data')
-        frame_download = tk.LabelFrame(self.master, text='Download')
-        frame_plot = tk.LabelFrame(self.master, text='Plot')
+        frame_data = ttk.LabelFrame(self.master, text='Data')
+        frame_download = ttk.LabelFrame(self.master, text='Download')
+        frame_plot = ttk.LabelFrame(self.master, text='Plot')
         frame_data.grid(row=0, column=1)
         frame_download.grid(row=1, column=1)
         frame_plot.grid(row=2, column=1)
 
         # frame_data
-        label_raw = tk.Label(frame_data, text='Raw:')
+        label_raw = ttk.Label(frame_data, text='Raw:')
+        label_ref = ttk.Label(frame_data, text='Reference:')
         self.filename_raw = tk.StringVar(value='please drag & drop!')
-        self.label_filename_raw = tk.Label(frame_data, textvariable=self.filename_raw)
-        label_ref = tk.Label(frame_data, text='Reference:')
-        label_ref.bind('<Button-1>', self.show_ref)
         self.filename_ref = tk.StringVar(value='please drag & drop!')
-        label_filename_ref = tk.Label(frame_data, textvariable=self.filename_ref)
+        label_filename_raw = ttk.Label(frame_data, textvariable=self.filename_raw)
+        label_filename_ref = ttk.Label(frame_data, textvariable=self.filename_ref)
+        label_ref.bind('<Button-1>', self.show_ref)
         label_filename_ref.bind('<Button-1>', self.show_ref)
         self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
-        optionmenu_material = tk.OptionMenu(frame_data, self.material, *self.calibrator.get_material_list())
         self.dimension = tk.StringVar(value=self.calibrator.get_dimension_list()[0])
-        optionmenu_dimension = tk.OptionMenu(frame_data, self.dimension, *self.calibrator.get_dimension_list())
         self.function = tk.StringVar(value=self.calibrator.get_function_list()[0])
-        optionmenu_function = tk.OptionMenu(frame_data, self.function, *self.calibrator.get_function_list())
-        self.button_calibrate = tk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
-
+        optionmenu_material = ttk.OptionMenu(frame_data, self.material, self.material.get(), *self.calibrator.get_material_list())
+        optionmenu_dimension = ttk.OptionMenu(frame_data, self.dimension, self.dimension.get(), *self.calibrator.get_dimension_list())
+        optionmenu_function = ttk.OptionMenu(frame_data, self.function, self.function.get(), *self.calibrator.get_function_list())
+        optionmenu_material['menu'].config(font=font_md)
+        optionmenu_dimension['menu'].config(font=font_md)
+        optionmenu_function['menu'].config(font=font_md)
+        self.button_calibrate = ttk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
         label_raw.grid(row=0, column=0)
-        self.label_filename_raw.grid(row=0, column=1)
+        label_filename_raw.grid(row=0, column=1, columnspan=2)
         label_ref.grid(row=1, column=0)
-        label_filename_ref.grid(row=1, column=1)
+        label_filename_ref.grid(row=1, column=1, columnspan=2)
         optionmenu_material.grid(row=2, column=0)
         optionmenu_dimension.grid(row=2, column=1)
         optionmenu_function.grid(row=2, column=2)
@@ -91,23 +107,18 @@ class MainWindow(tk.Frame):
 
         # frame_download
         self.file_to_download = tk.Variable(value=[])
-        self.listbox = tk.Listbox(frame_download, listvariable=self.file_to_download, selectmode=tk.MULTIPLE, width=8,
+        self.listbox = tk.Listbox(frame_download, listvariable=self.file_to_download, selectmode=tk.MULTIPLE,
                                   height=6, justify=tk.CENTER)
         self.listbox.bind('<Button-2>', self.delete)
         self.listbox.bind('<Button-3>', self.delete)
-        scrollbar = tk.Scrollbar(frame_download)
-        self.listbox.config(yscrollcommand=scrollbar.set)
-        scrollbar.config(command=self.listbox.yview)
-        self.button_add = tk.Button(frame_download, text='ADD', command=self.add)
-        self.button_delete = tk.Button(frame_download, text='DELETE', command=self.delete)
-        self.button_add_all = tk.Button(frame_download, text='ADD ALL', command=self.add_all)
-        self.button_delete_all = tk.Button(frame_download, text='DELETE ALL', command=self.delete_all)
-        self.button_save = tk.Button(frame_download, text='SAVE', command=self.save)
+        self.button_add = ttk.Button(frame_download, text='ADD', command=self.add, takefocus=False)
+        self.button_delete = ttk.Button(frame_download, text='DELETE', command=self.delete, takefocus=False)
+        self.button_add_all = ttk.Button(frame_download, text='ADD ALL', command=self.add_all, takefocus=False)
+        self.button_delete_all = ttk.Button(frame_download, text='DELETE ALL', command=self.delete_all, takefocus=False)
+        self.button_save = ttk.Button(frame_download, text='SAVE', command=self.save, takefocus=False)
         self.show_selection_in_map = tk.BooleanVar(value=True)
-        checkbox_show_selection_in_map = tk.Checkbutton(frame_download, text='Show in Map', variable=self.show_selection_in_map, command=self.update_selection)
-
+        checkbox_show_selection_in_map = ttk.Checkbutton(frame_download, text='Show in Map', variable=self.show_selection_in_map, command=self.update_selection)
         self.listbox.grid(row=0, column=0, columnspan=3)
-        scrollbar.grid(row=0, column=2)
         self.button_add.grid(row=1, column=0)
         self.button_delete.grid(row=2, column=0)
         self.button_add_all.grid(row=1, column=1)
@@ -117,27 +128,28 @@ class MainWindow(tk.Frame):
 
         # frame plot
         self.map_range = tk.StringVar(value='G(1570~1610)')
-        self.optionmenu_map_range = tk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
+        self.optionmenu_map_range = ttk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
                                                   command=self.change_map_range)
         self.optionmenu_map_range.config(state=tk.DISABLED)
+        self.optionmenu_map_range['menu'].config(font=font_md)
         self.map_range_1 = tk.DoubleVar(value=1570)
         self.map_range_2 = tk.DoubleVar(value=1610)
-        entry_map_range_1 = tk.Entry(frame_plot, textvariable=self.map_range_1, width=7, justify=tk.CENTER)
-        entry_map_range_2 = tk.Entry(frame_plot, textvariable=self.map_range_2, width=7, justify=tk.CENTER)
-        self.button_apply = tk.Button(frame_plot, text='APPLY', command=self.imshow, width=7, state=tk.DISABLED)
+        entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER)
+        entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER)
+        self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED)
         self.map_color = tk.StringVar(value='hot')
-        self.optionmenu_map_color = tk.OptionMenu(frame_plot, self.map_color,
-                                                  *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
-                                                           'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
-                                                           'gray', 'pink', 'spring', 'summer', 'autumn', 'winter',
-                                                           'RdBu', 'Spectral', 'bwr', 'coolwarm', 'hsv', 'twilight',
-                                                           'CMRmap', 'cubehelix', 'brg', 'gist_rainbow', 'rainbow',
-                                                           'jet', 'nipy_spectral', 'gist_ncar']),
-                                                  command=self.imshow)
+        self.optionmenu_map_color = ttk.OptionMenu(frame_plot, self.map_color, self.map_color.get(),
+                                           *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
+                                                    'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
+                                                    'gray', 'pink', 'spring', 'summer', 'autumn', 'winter',
+                                                    'RdBu', 'Spectral', 'bwr', 'coolwarm', 'hsv', 'twilight',
+                                                    'CMRmap', 'cubehelix', 'brg', 'gist_rainbow', 'rainbow',
+                                                    'jet', 'nipy_spectral', 'gist_ncar']),
+                                                   command=self.imshow)
         self.optionmenu_map_color.config(state=tk.DISABLED)
+        self.optionmenu_map_color['menu'].config(font=font_md)
         self.autoscale = tk.BooleanVar(value=True)
-        checkbox_autoscale = tk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
-
+        checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
         self.optionmenu_map_range.grid(row=0, column=0, columnspan=3)
         entry_map_range_1.grid(row=1, column=0)
         entry_map_range_2.grid(row=1, column=1)
@@ -146,12 +158,12 @@ class MainWindow(tk.Frame):
         checkbox_autoscale.grid(row=3, column=0, columnspan=3)
 
         # canvas_drop
-        self.canvas_drop = tk.Canvas(self.master, width=self.width_master, height=self.height_master)
-        self.canvas_drop.create_rectangle(0, 0, self.width_master, self.height_master / 2, fill='lightgray')
-        self.canvas_drop.create_rectangle(0, self.height_master / 2, self.width_master, self.height_master, fill='gray')
-        self.canvas_drop.create_text(self.width_master / 2, self.height_master / 4, text='2D Map .wdf File',
+        self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
+        self.canvas_drop.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 2, fill='lightgray')
+        self.canvas_drop.create_rectangle(0, self.height_canvas / 2, self.width_canvas, self.height_canvas, fill='gray')
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 4, text='2D Map .wdf File',
                                      font=('Arial', 30))
-        self.canvas_drop.create_text(self.width_master / 2, self.height_master * 3 / 4, text='Reference .wdf File',
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='Reference .wdf File',
                                      font=('Arial', 30))
 
     def calibrate(self) -> None:
@@ -351,6 +363,18 @@ class MainWindow(tk.Frame):
         self.row = 0
         self.col = 0
 
+    def check_loaded(func):
+        # マッピングデータが読み込まれているか確認するデコレータ
+        # 読み込まれていない場合，エラーメッセージを表示する
+        def wrapper(self, *args, **kwargs):
+            if self.filename_raw.get() == 'please drag & drop!':
+                messagebox.showerror('Error', 'Choose map data.')
+                return
+            return func(self, *args, **kwargs)
+        return wrapper
+
+    # noinspection PyArgumentList
+    @check_loaded
     def add(self) -> None:
         # 保存リストに追加する
         indices = self.file_to_download.get()
@@ -366,6 +390,8 @@ class MainWindow(tk.Frame):
 
         self.update_selection()
 
+    # noinspection PyArgumentList
+    @check_loaded
     def add_all(self) -> None:
         # 全ての点を保存リストに追加
         all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in
@@ -374,6 +400,8 @@ class MainWindow(tk.Frame):
 
         self.update_selection()
 
+    # noinspection PyArgumentList
+    @check_loaded
     def delete(self, event=None) -> None:
         # TODO: Treeviewに変更したら処理が楽になる
         # 保存リストから削除
@@ -392,6 +420,8 @@ class MainWindow(tk.Frame):
 
         self.update_selection()
 
+    # noinspection PyArgumentList
+    @check_loaded
     def delete_all(self) -> None:
         # 保存リストから全て削除
         self.file_to_download.set([])
