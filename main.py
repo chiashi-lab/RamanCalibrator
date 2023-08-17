@@ -15,15 +15,31 @@ font_sm = ('Arial', 12)
 
 rcParams['keymap.back'].remove('left')
 rcParams['keymap.forward'].remove('right')
+plt.rcParams['xtick.labelsize'] = 25
+plt.rcParams['ytick.labelsize'] = 25
+
+plt.rcParams['figure.subplot.top'] = 0.95
+plt.rcParams['figure.subplot.bottom'] = 0.05
+plt.rcParams['figure.subplot.left'] = 0.05
+plt.rcParams['figure.subplot.right'] = 0.95
+
+
+def check_loaded(func):
+    # マッピングデータが読み込まれているか確認するデコレータ
+    # 読み込まれていない場合，エラーメッセージを表示する
+    def wrapper(self, *args, **kwargs):
+        if self.filename_raw.get() == 'please drag & drop!':
+            messagebox.showerror('Error', 'Choose map data.')
+            return
+        return func(self, *args, **kwargs)
+
+    return wrapper
 
 
 class MainWindow(tk.Frame):
     def __init__(self, master: tk.Tk) -> None:
         super().__init__(master)
         self.master = master
-        self.width_master = 1800
-        self.height_master = 650
-        self.master.geometry(f'{self.width_master}x{self.height_master}')
         self.master.title('Renishaw Calibrator')
 
         self.calibrator = RenishawCalibrator()
@@ -45,12 +61,12 @@ class MainWindow(tk.Frame):
         style.theme_use('winnative')
         style.configure('TButton', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='black')
         style.configure('R.TButton', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='red')
-        style.configure('TLabel', font=font_sm, padding=[0, 4, 0, 4], foreground='black')
-        style.configure('Color.TLabel', font=font_lg, padding=[0, 0, 0, 0], width=4, background='black')
-        style.configure('TEntry', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='black')
-        style.configure('TCheckbutton', font=font_md, padding=[0, 4, 0, 4], foreground='black')
+        style.configure('TLabel', font=font_sm, foreground='black')
+        style.configure('TEntry', padding=[0, 4, 0, 4], foreground='black')
+        style.configure('TCheckbutton', font=font_md, foreground='black')
         style.configure('TMenubutton', font=font_md, foreground='black')
-        style.configure('TListbox', font=font_md, foreground='black')
+        style.configure('Treeview', font=font_md, foreground='black')
+        style.configure('Treeview.Heading', font=font_md, foreground='black')
         # canvas
         self.width_canvas = 1200
         self.height_canvas = 600
@@ -64,7 +80,6 @@ class MainWindow(tk.Frame):
         toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
         toolbar.update()
         toolbar.grid(row=3, column=0)
-        plt.subplots_adjust(left=0.01, right=0.99, bottom=0.05, top=0.99)
         fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.canvas.mpl_connect('key_press_event', self.key_pressed)
         self.canvas.mpl_connect('key_press_event', key_press_handler)
@@ -106,11 +121,17 @@ class MainWindow(tk.Frame):
         self.button_calibrate.grid(row=3, column=0, columnspan=3)
 
         # frame_download
-        self.file_to_download = tk.Variable(value=[])
-        self.listbox = tk.Listbox(frame_download, listvariable=self.file_to_download, selectmode=tk.MULTIPLE,
-                                  height=6, justify=tk.CENTER)
-        self.listbox.bind('<Button-2>', self.delete)
-        self.listbox.bind('<Button-3>', self.delete)
+        self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
+        self.treeview['columns'] = ['ix', 'iy']
+        self.treeview.column('#0', width=0, stretch=tk.NO)
+        self.treeview.column('ix', width=50, anchor=tk.CENTER)
+        self.treeview.column('iy', width=50, anchor=tk.CENTER)
+        self.treeview.heading('#0', text='')
+        self.treeview.heading('ix', text='ix')
+        self.treeview.heading('iy', text='iy')
+        self.treeview.bind('<<TreeviewSelect>>', self.select_from_treeview)
+        self.treeview.bind('<Button-2>', self.delete)
+        self.treeview.bind('<Button-3>', self.delete)
         self.button_add = ttk.Button(frame_download, text='ADD', command=self.add, takefocus=False)
         self.button_delete = ttk.Button(frame_download, text='DELETE', command=self.delete, takefocus=False)
         self.button_add_all = ttk.Button(frame_download, text='ADD ALL', command=self.add_all, takefocus=False)
@@ -118,7 +139,8 @@ class MainWindow(tk.Frame):
         self.button_save = ttk.Button(frame_download, text='SAVE', command=self.save, takefocus=False)
         self.show_selection_in_map = tk.BooleanVar(value=True)
         checkbox_show_selection_in_map = ttk.Checkbutton(frame_download, text='Show in Map', variable=self.show_selection_in_map, command=self.update_selection)
-        self.listbox.grid(row=0, column=0, columnspan=3)
+        # self.listbox.grid(row=0, column=0, columnspan=3)
+        self.treeview.grid(row=0, column=0, columnspan=3)
         self.button_add.grid(row=1, column=0)
         self.button_delete.grid(row=2, column=0)
         self.button_add_all.grid(row=1, column=1)
@@ -128,14 +150,13 @@ class MainWindow(tk.Frame):
 
         # frame plot
         self.map_range = tk.StringVar(value='G(1570~1610)')
-        self.optionmenu_map_range = ttk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
-                                                  command=self.change_map_range)
+        self.optionmenu_map_range = ttk.OptionMenu(frame_plot, self.map_range, self.map_range.get(), 'G(1570~1610)', '2D(2550~2750)', command=self.change_map_range)
         self.optionmenu_map_range.config(state=tk.DISABLED)
         self.optionmenu_map_range['menu'].config(font=font_md)
         self.map_range_1 = tk.DoubleVar(value=1570)
         self.map_range_2 = tk.DoubleVar(value=1610)
-        entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER)
-        entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER)
+        entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md, width=6)
+        entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md, width=6)
         self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED)
         self.map_color = tk.StringVar(value='hot')
         self.optionmenu_map_color = ttk.OptionMenu(frame_plot, self.map_color, self.map_color.get(),
@@ -197,18 +218,18 @@ class MainWindow(tk.Frame):
             self.imshow()
             return
         # column majorに変換
-        row, col = self.calibrator.row2col(self.row, self.col)
-        if event.key == 'up' and row < self.calibrator.shape[0] - 1:
-            row += 1
-        elif event.key == 'down' and 0 < row:
-            row -= 1
-        elif event.key == 'right' and col < self.calibrator.shape[1] - 1:
-            col += 1
-        elif event.key == 'left' and 0 < col:
-            col -= 1
+        iy, ix = self.calibrator.row2col(self.row, self.col)
+        if event.key == 'up' and iy < self.calibrator.shape[0] - 1:
+            iy += 1
+        elif event.key == 'down' and 0 < iy:
+            iy -= 1
+        elif event.key == 'right' and ix < self.calibrator.shape[1] - 1:
+            ix += 1
+        elif event.key == 'left' and 0 < ix:
+            ix -= 1
         else:
             return
-        self.row, self.col = self.calibrator.col2row(row, col)
+        self.row, self.col = self.calibrator.col2row(iy, ix)
         self.update_plot()
 
     def change_map_range(self, event=None) -> None:
@@ -264,19 +285,20 @@ class MainWindow(tk.Frame):
                 self.line[0].remove()
             else:  # for after calibration
                 self.ax[1].cla()
-        idx = self.calibrator.row2col(self.row, self.col)
+        iy, ix = self.calibrator.row2col(self.row, self.col)
         self.line = self.ax[1].plot(
             self.calibrator.xdata,
             self.calibrator.map_data[self.row][self.col],
-            label=str(idx), color='r', linewidth=0.8)
-        self.ax[1].legend()
+            label=f'({ix}, {iy})', color='r', linewidth=0.8)
+        self.ax[1].legend(fontsize=18)
         self.canvas.draw()
 
     def update_selection(self):
         for r in self.selection_patches:
             r.remove()
         self.selection_patches = []
-        for idx1, idx2 in self.file_to_download.get():
+        for child in self.treeview.get_children():
+            idx2, idx1 = self.treeview.item(child)['values']
             row, col = self.calibrator.col2row(idx1, idx2)
             x, y = self.calibrator.idx2coord(row, col)
             x1 = x - self.calibrator.x_pad / 2
@@ -292,6 +314,12 @@ class MainWindow(tk.Frame):
             for r in self.selection_patches:
                 r.set_visible(True)
         self.canvas.draw()
+
+    def select_from_treeview(self, event=None):
+        if self.treeview.focus() == '':
+            return
+        self.row, self.col = self.calibrator.col2row(*self.treeview.item(self.treeview.focus())['values'][::-1])
+        self.update_plot()
 
     def drop(self, event: TkinterDnD.DnDEvent) -> None:
         # ドラッグ&ドロップされたファイルを処理
@@ -363,73 +391,59 @@ class MainWindow(tk.Frame):
         self.row = 0
         self.col = 0
 
-    def check_loaded(func):
-        # マッピングデータが読み込まれているか確認するデコレータ
-        # 読み込まれていない場合，エラーメッセージを表示する
-        def wrapper(self, *args, **kwargs):
-            if self.filename_raw.get() == 'please drag & drop!':
-                messagebox.showerror('Error', 'Choose map data.')
-                return
-            return func(self, *args, **kwargs)
-        return wrapper
-
-    # noinspection PyArgumentList
     @check_loaded
     def add(self) -> None:
         # 保存リストに追加する
-        indices = self.file_to_download.get()
-        if indices == '':
-            indices = []
-        else:
-            indices = list(indices)
-        index = tuple(self.calibrator.row2col(self.row, self.col))
-        if index in indices:  # already exists
-            return
-        indices.append(index)
-        self.file_to_download.set(indices)
+        index = self.calibrator.row2col(self.row, self.col)[::-1]
 
+        # 既に追加されている場合は追加しない
+        for child in self.treeview.get_children():
+            if self.treeview.item(child)['values'] == list(index):
+                return
+        self.treeview.insert('', tk.END, text='', values=index)
+        self.treeview.yview_moveto(1)
         self.update_selection()
 
-    # noinspection PyArgumentList
     @check_loaded
     def add_all(self) -> None:
         # 全ての点を保存リストに追加
-        all_indices = [(idx1, idx2) for idx2 in range(self.calibrator.shape[1]) for idx1 in
+        all_indices = [[idx2, idx1] for idx2 in range(self.calibrator.shape[1]) for idx1 in
                        range(self.calibrator.shape[0])]
-        self.file_to_download.set(all_indices)
-
+        self.treeview.delete(*self.treeview.get_children())
+        for index in all_indices:
+            self.treeview.insert('', tk.END, text='', values=index)
         self.update_selection()
 
-    # noinspection PyArgumentList
     @check_loaded
     def delete(self, event=None) -> None:
-        # TODO: Treeviewに変更したら処理が楽になる
         # 保存リストから削除
         # 右クリックから呼ばれた場合、ダイアログを表示
         if event is not None:
             if not messagebox.askyesno('Confirmation', 'Delete these?'):
                 return
 
-        idx_to_delete = list(self.listbox.curselection())
+        idx_to_delete = [self.treeview.item(iid)['values'] for iid in self.treeview.selection()]
         # 何も選択されていない場合、現在の点を削除
         if len(idx_to_delete) == 0:
-            idx_to_delete = [self.file_to_download.get().index(tuple(self.calibrator.row2col(self.row, self.col)))]
+            idx_to_delete = [list(self.calibrator.row2col(self.row, self.col))[::-1]]
 
-        for idx in sorted(idx_to_delete, reverse=True):
-            self.listbox.delete(idx)
+        for child in self.treeview.get_children():
+            if self.treeview.item(child)['values'] in idx_to_delete:
+                self.treeview.delete(child)
 
         self.update_selection()
 
-    # noinspection PyArgumentList
     @check_loaded
     def delete_all(self) -> None:
         # 保存リストから全て削除
-        self.file_to_download.set([])
+        if not messagebox.askyesno('Confirmation', 'Delete all?'):
+            return
+        self.treeview.delete(*self.treeview.get_children())
         self.update_selection()
 
     def save(self) -> None:
         # 保存リスト内のファイルを保存
-        if not self.file_to_download.get():
+        if not self.treeview.get_children():
             return
 
         # フォルダを選択
@@ -439,15 +453,16 @@ class MainWindow(tk.Frame):
             return
 
         xdata = self.calibrator.xdata
-        for idx1, idx2 in self.file_to_download.get():
-            row, col = self.calibrator.col2row(idx1, idx2)
+        for child in self.treeview.get_children():
+            ix, iy = self.treeview.item(child)['values']
+            row, col = self.calibrator.col2row(iy, ix)
             spectrum = self.calibrator.map_data[row][col]
             abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
             if self.filename_ref.get() == 'please drag & drop!':
                 abs_path_ref = ''
             else:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
-            filename = os.path.join(folder_to_save, f'{str(idx1)}_{str(idx2)}.txt')
+            filename = os.path.join(folder_to_save, f'{str(ix)}_{str(iy)}.txt')
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
