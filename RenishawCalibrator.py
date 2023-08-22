@@ -32,7 +32,6 @@ class RenishawCalibrator(Calibrator):
         self.xdata = self.reader_raw.xdata.copy()
         self.map_data = self.reader_raw.spectra.copy()
         # 二次元じゃない場合False (x座標) x (y座標) x (スペクトル) の3次元のはず
-        print(self.map_data.shape)
         if len(self.map_data.shape) != 3:
             return False
         self.shape = self.map_data.shape[:2]
@@ -119,3 +118,7 @@ class RenishawCalibrator(Calibrator):
             return True
         else:
             return False
+
+    def close(self):
+        self.reader_raw.close()
+        self.reader_ref.close()

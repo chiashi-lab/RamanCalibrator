@@ -250,8 +250,8 @@ class MainWindow(tk.Frame):
         try:
             self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
             self.update_selection()
-        except ValueError:
-            print('ValueError')
+        except ValueError as e:
+            print('ValueError', e)
 
     def show_ref(self, event=None):
         if self.filename_ref.get() == 'please drag & drop!':
@@ -477,6 +477,7 @@ class MainWindow(tk.Frame):
                     f.write(f'{x},{y}\n')
 
     def quit(self) -> None:
+        self.calibrator.close()
         self.master.quit()
         self.master.destroy()
 
