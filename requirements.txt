@@ -1,6 +1,6 @@
-numpy==1.24.2
-pillow==9.4.0
-matplotlib==3.6.3
+git+https://github.com/PlusF/Calibrator
+numpy~=1.19.3
+pillow~=8.4.0
+matplotlib~=3.3.4
 tkinterdnd2==0.3.0
 renishawWiRE==0.1.16
-git+https://github.com/PlusF/Calibrator

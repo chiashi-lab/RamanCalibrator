@@ -60,7 +60,7 @@ class RenishawCalibrator(Calibrator):
             raise ValueError('Load data before reset.')
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
-    def imshow(self, ax: plt.Axes, map_range: list[float], cmap: str) -> None:
+    def imshow(self, ax: plt.Axes, map_range: list, cmap: str) -> None:
         if self.reader_raw is None:
             raise ValueError('Load data before imshow.')
         # マッピングの表示
@@ -120,5 +120,7 @@ class RenishawCalibrator(Calibrator):
             return False
 
     def close(self):
-        self.reader_raw.close()
-        self.reader_ref.close()
+        if self.reader_raw is not None:
+            self.reader_raw.close()
+        if self.reader_ref is not None:
+            self.reader_ref.close()
