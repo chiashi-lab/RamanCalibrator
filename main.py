@@ -204,6 +204,7 @@ class MainWindow(tk.Frame):
         self.line = None
 
     def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
+        print(event.xdata, event.ydata)
         # クリックした点のスペクトルを表示する
         if self.filename_raw.get() == 'please drag & drop!':
             return
@@ -220,7 +221,7 @@ class MainWindow(tk.Frame):
             self.imshow()
             return
         # column majorに変換
-        iy, ix = self.calibrator.row2col(self.row, self.col)
+        ix, iy = self.col, self.row
         if event.key == 'up' and iy < self.calibrator.shape[0] - 1:
             iy += 1
         elif event.key == 'down' and 0 < iy:
@@ -231,7 +232,7 @@ class MainWindow(tk.Frame):
             ix -= 1
         else:
             return
-        self.row, self.col = self.calibrator.col2row(iy, ix)
+        self.row, self.col = iy, ix
         self.update_plot()
 
     def change_map_range(self, event=None) -> None:
@@ -250,6 +251,7 @@ class MainWindow(tk.Frame):
         try:
             self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
             self.update_selection()
+            self.update_plot()
         except ValueError as e:
             print('ValueError', e)
 
@@ -272,6 +274,7 @@ class MainWindow(tk.Frame):
     def update_plot(self) -> None:
         # マッピング上のクロスヘアを移動
         x, y = self.calibrator.idx2coord(self.row, self.col)
+        print(x, y)
         self.horizontal_line.set_ydata(y)
         self.vertical_line.set_xdata(x)
 
@@ -287,11 +290,10 @@ class MainWindow(tk.Frame):
                 self.line[0].remove()
             else:  # for after calibration
                 self.ax[1].cla()
-        iy, ix = self.calibrator.row2col(self.row, self.col)
         self.line = self.ax[1].plot(
             self.calibrator.xdata,
             self.calibrator.map_data[self.row][self.col],
-            label=f'({ix}, {iy})', color='r', linewidth=0.8)
+            label=f'({self.col}, {self.row})', color='r', linewidth=0.8)
         self.ax[1].legend(fontsize=18)
         self.canvas.draw()
 
@@ -300,8 +302,7 @@ class MainWindow(tk.Frame):
             r.remove()
         self.selection_patches = []
         for child in self.treeview.get_children():
-            idx2, idx1 = self.treeview.item(child)['values']
-            row, col = self.calibrator.col2row(idx1, idx2)
+            col, row = self.treeview.item(child)['values']
             x, y = self.calibrator.idx2coord(row, col)
             x1 = x - self.calibrator.x_pad / 2
             y1 = y - self.calibrator.y_pad / 2
@@ -320,7 +321,7 @@ class MainWindow(tk.Frame):
     def select_from_treeview(self, event=None):
         if self.treeview.focus() == '':
             return
-        self.row, self.col = self.calibrator.col2row(*self.treeview.item(self.treeview.focus())['values'][::-1])
+        self.col, self.row = self.treeview.item(self.treeview.focus())['values']
         self.update_plot()
 
     def drop(self, event: TkinterDnD.DnDEvent) -> None:
@@ -399,13 +400,11 @@ class MainWindow(tk.Frame):
     @check_loaded
     def add(self) -> None:
         # 保存リストに追加する
-        index = self.calibrator.row2col(self.row, self.col)[::-1]
-
         # 既に追加されている場合は追加しない
         for child in self.treeview.get_children():
-            if self.treeview.item(child)['values'] == list(index):
+            if self.treeview.item(child)['values'] == [self.col, self.row]:
                 return
-        self.treeview.insert('', tk.END, text='', values=index)
+        self.treeview.insert('', tk.END, text='', values=[self.col, self.row])
         self.treeview.yview_moveto(1)
         self.update_selection()
 
@@ -430,7 +429,7 @@ class MainWindow(tk.Frame):
         idx_to_delete = [self.treeview.item(iid)['values'] for iid in self.treeview.selection()]
         # 何も選択されていない場合、現在の点を削除
         if len(idx_to_delete) == 0:
-            idx_to_delete = [list(self.calibrator.row2col(self.row, self.col))[::-1]]
+            idx_to_delete = [[self.col, self.row]]
 
         for child in self.treeview.get_children():
             if self.treeview.item(child)['values'] in idx_to_delete:
@@ -459,15 +458,14 @@ class MainWindow(tk.Frame):
 
         xdata = self.calibrator.xdata
         for child in self.treeview.get_children():
-            ix, iy = self.treeview.item(child)['values']
-            row, col = self.calibrator.col2row(iy, ix)
+            col, row = self.treeview.item(child)['values']
             spectrum = self.calibrator.map_data[row][col]
             abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
             if self.filename_ref.get() == 'please drag & drop!':
                 abs_path_ref = ''
             else:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
-            filename = os.path.join(folder_to_save, f'{str(ix)}_{str(iy)}.txt')
+            filename = os.path.join(folder_to_save, f'{str(col)}_{str(row)}.txt')
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')

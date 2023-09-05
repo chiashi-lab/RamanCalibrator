@@ -31,7 +31,8 @@ class RamanCalibrator(Calibrator):
         self.reader_raw = RamanHDFReader(filename)
         self.xdata = self.reader_raw.xdata.copy()
         # TODO: 宇宙線除去を行う
-        self.map_data = self.reader_raw.spectra.copy().sum(axis=2)
+        self.map_data = self.reader_raw.spectra.copy().sum(axis=2).transpose(1, 0, 2)
+        print(self.map_data.shape)
         # 二次元じゃない場合False (x座標) x (y座標) x (スペクトル) の3次元のはず
         if len(self.map_data.shape) != 3:
             return False
@@ -65,57 +66,26 @@ class RamanCalibrator(Calibrator):
         if self.reader_raw is None:
             raise ValueError('Load data before imshow.')
         # マッピングの表示
-        # # 光学像の位置、サイズを取り出す
-        # img_x0, img_y0 = self.reader_raw.img_origins
-        # img_w, img_h = self.reader_raw.img_dimensions
-        # img = PIL.Image.open(self.reader_raw.img)
-        # extent_optical = (img_x0, img_x0 + img_w, img_y0 + img_h, img_y0)
-        # ax.set_xlim(img_x0, img_x0 + img_w)
-        # ax.set_ylim(img_y0 + img_h, img_y0)
-        # # まずは光学像を描画
-        # ax.imshow(img, extent=extent_optical)
-
         extent_mapping = (self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
-        extent_mapping = (extent_mapping[2], extent_mapping[3], extent_mapping[0], extent_mapping[1])
         map_range_idx = (map_range[0] < self.xdata) & (self.xdata < map_range[1])
         data = self.map_data[:, :, map_range_idx]
         if data.shape[2] == 0:
             return
         data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
-        # data = data.reshape(data.shape[::-1]).T
         # 光学像の上にマッピングを描画
         ax.imshow(data, alpha=0.9, extent=extent_mapping, origin='lower', cmap=cmap)
 
-    def col2row(self, row: int, col: int) -> [int, int]:
-        idx = col * self.shape[0] + row
-        # row major
-        row = idx // self.shape[1]
-        col = idx % self.shape[1]
-
-        return row, col
-
-    def row2col(self, row: int, col: int) -> [int, int]:
-        idx = row * self.shape[1] + col
-        # column major
-        col = idx // self.shape[0]
-        row = idx % self.shape[0]
-
-        return row, col
-
     def coord2idx(self, x_pos: float, y_pos: float) -> [int, int]:
-        # get index of column major
         col = round((x_pos - self.x_start) // self.x_pad)
         row = round((y_pos - self.y_start) // self.y_pad)
-        # change to row major and return it
-        return self.col2row(row, col)
+        return row, col
 
     def idx2coord(self, row: int, col: int) -> [float, float]:
-        # get column major index
-        row, col = self.row2col(row, col)
         return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.5)
 
     def is_inside(self, x: float, y: float) -> bool:
         # check if the selected position is inside the mapping
+        print(x, y, self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
         if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start + self.y_span <= y <= self.y_start):
             return True
         else:
