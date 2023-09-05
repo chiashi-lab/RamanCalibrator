@@ -1,7 +1,7 @@
 import numpy as np
 import PIL
 import matplotlib.pyplot as plt
-from renishawWiRE import WDFReader
+from dataloader import RamanHDFReader
 from calibrator import Calibrator
 
 
@@ -11,11 +11,11 @@ def subtract_baseline(data: np.ndarray):
 
 
 # Calibratorは自作ライブラリ。Rayleigh, Raman用のデータとフィッティングの関数等が含まれている。
-class RenishawCalibrator(Calibrator):
+class RamanCalibrator(Calibrator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.reader_raw: WDFReader = None
-        self.reader_ref: WDFReader = None
+        self.reader_raw: RamanHDFReader = None
+        self.reader_ref: RamanHDFReader = None
 
         self.map_data: np.ndarray = None
 
@@ -28,9 +28,10 @@ class RenishawCalibrator(Calibrator):
 
     def load_raw(self, filename: str) -> bool:
         # 二次元マッピングファイルを読み込む
-        self.reader_raw = WDFReader(filename)
+        self.reader_raw = RamanHDFReader(filename)
         self.xdata = self.reader_raw.xdata.copy()
-        self.map_data = self.reader_raw.spectra.copy()
+        # TODO: 宇宙線除去を行う
+        self.map_data = self.reader_raw.spectra.copy().sum(axis=2)
         # 二次元じゃない場合False (x座標) x (y座標) x (スペクトル) の3次元のはず
         if len(self.map_data.shape) != 3:
             return False
@@ -48,7 +49,7 @@ class RenishawCalibrator(Calibrator):
 
     def load_ref(self, filename: str) -> None:
         # 標準サンプルのファイルを読み込む
-        self.reader_ref = WDFReader(filename)
+        self.reader_ref = RamanHDFReader(filename)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
             self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
             print('Reference data is supposed to be single measurement, but map data was loaded.')
@@ -64,23 +65,24 @@ class RenishawCalibrator(Calibrator):
         if self.reader_raw is None:
             raise ValueError('Load data before imshow.')
         # マッピングの表示
-        # 光学像の位置、サイズを取り出す
-        img_x0, img_y0 = self.reader_raw.img_origins
-        img_w, img_h = self.reader_raw.img_dimensions
-        img = PIL.Image.open(self.reader_raw.img)
-        extent_optical = (img_x0, img_x0 + img_w, img_y0 + img_h, img_y0)
-        ax.set_xlim(img_x0, img_x0 + img_w)
-        ax.set_ylim(img_y0 + img_h, img_y0)
-        # まずは光学像を描画
-        ax.imshow(img, extent=extent_optical)
+        # # 光学像の位置、サイズを取り出す
+        # img_x0, img_y0 = self.reader_raw.img_origins
+        # img_w, img_h = self.reader_raw.img_dimensions
+        # img = PIL.Image.open(self.reader_raw.img)
+        # extent_optical = (img_x0, img_x0 + img_w, img_y0 + img_h, img_y0)
+        # ax.set_xlim(img_x0, img_x0 + img_w)
+        # ax.set_ylim(img_y0 + img_h, img_y0)
+        # # まずは光学像を描画
+        # ax.imshow(img, extent=extent_optical)
 
         extent_mapping = (self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
+        extent_mapping = (extent_mapping[2], extent_mapping[3], extent_mapping[0], extent_mapping[1])
         map_range_idx = (map_range[0] < self.xdata) & (self.xdata < map_range[1])
         data = self.map_data[:, :, map_range_idx]
         if data.shape[2] == 0:
             return
         data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
-        data = data.reshape(data.shape[::-1]).T
+        # data = data.reshape(data.shape[::-1]).T
         # 光学像の上にマッピングを描画
         ax.imshow(data, alpha=0.9, extent=extent_mapping, origin='lower', cmap=cmap)
 

@@ -7,7 +7,7 @@ import matplotlib.backend_bases
 from matplotlib import rcParams, patches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
-from RenishawCalibrator import RenishawCalibrator
+from RamanCalibrator import RamanCalibrator
 from MyTooltip import MyTooltip
 
 font_lg = ('Arial', 24)
@@ -43,7 +43,7 @@ class MainWindow(tk.Frame):
         self.master = master
         self.master.title('Renishaw Calibrator')
 
-        self.calibrator = RenishawCalibrator()
+        self.calibrator = RamanCalibrator()
 
         self.row = self.col = 0
 
@@ -184,9 +184,9 @@ class MainWindow(tk.Frame):
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
         self.canvas_drop.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 2, fill='lightgray')
         self.canvas_drop.create_rectangle(0, self.height_canvas / 2, self.width_canvas, self.height_canvas, fill='gray')
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 4, text='2D Map .wdf File',
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 4, text='2D Map .hdf5 File',
                                      font=('Arial', 30))
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='Reference .wdf File',
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='Reference .hdf5 File',
                                      font=('Arial', 30))
 
     def calibrate(self) -> None:
@@ -335,9 +335,9 @@ class MainWindow(tk.Frame):
         else:
             filename = event.data.split()[0]
 
-        # wdfファイルのみ受け付ける
-        if filename.split('.')[-1] != 'wdf':
-            messagebox.showerror('Error', 'Only .wdf files are acceptable.')
+        # hdf5ファイルのみ受け付ける
+        if filename.split('.')[-1] != 'hdf5':
+            messagebox.showerror('Error', 'Only .hdf5 files are acceptable.')
             return
 
         # どこにdropしたかでマッピングファイルなのか、標準サンプルファイルなのか仕分ける
