@@ -1,5 +1,4 @@
 import numpy as np
-import PIL
 import matplotlib.pyplot as plt
 from dataloader import RamanHDFReader
 from calibrator import Calibrator
@@ -85,8 +84,7 @@ class RamanCalibrator(Calibrator):
 
     def is_inside(self, x: float, y: float) -> bool:
         # check if the selected position is inside the mapping
-        print(x, y, self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
-        if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start + self.y_span <= y <= self.y_start):
+        if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start <= y <= self.y_start + self.y_span):
             return True
         else:
             return False

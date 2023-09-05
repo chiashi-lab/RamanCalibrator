@@ -113,7 +113,7 @@ class MainWindow(tk.Frame):
         optionmenu_material['menu'].config(font=font_md)
         optionmenu_dimension['menu'].config(font=font_md)
         optionmenu_function['menu'].config(font=font_md)
-        self.button_calibrate = ttk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
+        self.button_calibrate = ttk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED, takefocus=False)
         label_raw.grid(row=0, column=0)
         label_filename_raw.grid(row=0, column=1, columnspan=2)
         label_ref.grid(row=1, column=0)
@@ -159,7 +159,7 @@ class MainWindow(tk.Frame):
         self.map_range_2 = tk.DoubleVar(value=1610)
         entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md, width=6)
         entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md, width=6)
-        self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED)
+        self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED, takefocus=False)
         self.map_color = tk.StringVar(value='hot')
         self.optionmenu_map_color = ttk.OptionMenu(frame_plot, self.map_color, self.map_color.get(),
                                            *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
@@ -172,7 +172,7 @@ class MainWindow(tk.Frame):
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.optionmenu_map_color['menu'].config(font=font_md)
         self.autoscale = tk.BooleanVar(value=True)
-        checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
+        checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale, takefocus=False)
         self.optionmenu_map_range.grid(row=0, column=0, columnspan=2, sticky=tk.EW)
         entry_map_range_1.grid(row=1, column=0)
         entry_map_range_2.grid(row=1, column=1)
@@ -204,7 +204,6 @@ class MainWindow(tk.Frame):
         self.line = None
 
     def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
-        print(event.xdata, event.ydata)
         # クリックした点のスペクトルを表示する
         if self.filename_raw.get() == 'please drag & drop!':
             return
@@ -220,19 +219,16 @@ class MainWindow(tk.Frame):
         if event.key == 'enter':
             self.imshow()
             return
-        # column majorに変換
-        ix, iy = self.col, self.row
-        if event.key == 'up' and iy < self.calibrator.shape[0] - 1:
-            iy += 1
-        elif event.key == 'down' and 0 < iy:
-            iy -= 1
-        elif event.key == 'right' and ix < self.calibrator.shape[1] - 1:
-            ix += 1
-        elif event.key == 'left' and 0 < ix:
-            ix -= 1
+        if event.key in ['up', 'w'] and self.row < self.calibrator.shape[0] - 1:
+            self.row += 1
+        elif event.key in ['down', 's'] and 0 < self.row:
+            self.row -= 1
+        elif event.key in ['right', 'd'] and self.col < self.calibrator.shape[1] - 1:
+            self.col += 1
+        elif event.key in ['left', 'a'] and 0 < self.col:
+            self.col -= 1
         else:
             return
-        self.row, self.col = iy, ix
         self.update_plot()
 
     def change_map_range(self, event=None) -> None:
@@ -250,8 +246,8 @@ class MainWindow(tk.Frame):
         self.vertical_line = self.ax[0].axvline(color='k', lw=1, ls='--')
         try:
             self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
-            self.update_selection()
             self.update_plot()
+            self.update_selection()
         except ValueError as e:
             print('ValueError', e)
 
@@ -274,7 +270,6 @@ class MainWindow(tk.Frame):
     def update_plot(self) -> None:
         # マッピング上のクロスヘアを移動
         x, y = self.calibrator.idx2coord(self.row, self.col)
-        print(x, y)
         self.horizontal_line.set_ydata(y)
         self.vertical_line.set_xdata(x)
 
@@ -373,7 +368,6 @@ class MainWindow(tk.Frame):
             self.button_apply.config(state=tk.ACTIVE)
             self.optionmenu_map_color.config(state=tk.ACTIVE)
             self.imshow()
-            self.update_plot()
             self.tooltip_raw.set(filename)
 
     def drop_enter(self, event: TkinterDnD.DnDEvent) -> None:
