@@ -31,7 +31,6 @@ class RamanCalibrator(Calibrator):
         self.xdata = self.reader_raw.xdata.copy()
         # TODO: 宇宙線除去を行う
         self.map_data = self.reader_raw.spectra.copy().sum(axis=2).transpose(1, 0, 2)
-        print(self.map_data.shape)
         # 二次元じゃない場合False (x座標) x (y座標) x (スペクトル) の3次元のはず
         if len(self.map_data.shape) != 3:
             return False

@@ -41,7 +41,7 @@ class MainWindow(tk.Frame):
     def __init__(self, master: tk.Tk) -> None:
         super().__init__(master)
         self.master = master
-        self.master.title('Renishaw Calibrator')
+        self.master.title('Raman Calibrator')
 
         self.calibrator = RamanCalibrator()
 
