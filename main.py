@@ -2,6 +2,7 @@ import os
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 from tkinterdnd2 import TkinterDnD, DND_FILES
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.backend_bases
 from matplotlib import rcParams, patches
@@ -42,6 +43,19 @@ class MainWindow(tk.Frame):
         super().__init__(master)
         self.master = master
         self.master.title('Raman Calibrator')
+        self.master.bind('<Control-Key-z>', self.undo)
+
+        self.x0, self.y0, self.x1, self.y1 = 0, 0, 0, 0
+        self.rectangles = []
+        self.texts = []
+        self.ranges = []
+        self.drawing = False
+        self.rect_drawing = None
+
+        self.new_window = None
+        self.widgets_assign = {}
+
+        self.showing_ref = False
 
         self.calibrator = RamanCalibrator()
 
@@ -76,11 +90,14 @@ class MainWindow(tk.Frame):
             self.width_canvas /= 2
             self.height_canvas /= 2
         fig, self.ax = plt.subplots(1, 2, figsize=(self.width_canvas / dpi, self.height_canvas / dpi), dpi=dpi)
+        fig.canvas.mpl_connect('button_press_event', self.on_press)
+        fig.canvas.mpl_connect('motion_notify_event', self.draw_preview)
+        fig.canvas.mpl_connect('button_release_event', self.on_release)
         self.canvas = FigureCanvasTkAgg(fig, self.master)
         self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=3)
-        toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
-        toolbar.update()
-        toolbar.grid(row=3, column=0)
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
+        self.toolbar.update()
+        self.toolbar.grid(row=3, column=0)
         fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.canvas.mpl_connect('key_press_event', self.key_pressed)
         self.canvas.mpl_connect('key_press_event', key_press_handler)
@@ -113,6 +130,7 @@ class MainWindow(tk.Frame):
         optionmenu_material['menu'].config(font=font_md)
         optionmenu_dimension['menu'].config(font=font_md)
         optionmenu_function['menu'].config(font=font_md)
+        button_assign_manually = ttk.Button(frame_data, text='ASSIGN', command=self.open_assign_window)
         self.button_calibrate = ttk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED, takefocus=False)
         label_raw.grid(row=0, column=0)
         label_filename_raw.grid(row=0, column=1, columnspan=2)
@@ -121,7 +139,8 @@ class MainWindow(tk.Frame):
         optionmenu_material.grid(row=2, column=0)
         optionmenu_dimension.grid(row=2, column=1)
         optionmenu_function.grid(row=2, column=2)
-        self.button_calibrate.grid(row=3, column=0, columnspan=3)
+        button_assign_manually.grid(row=3, column=0)
+        self.button_calibrate.grid(row=3, column=1, columnspan=2)
 
         # frame_download
         self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
@@ -189,19 +208,75 @@ class MainWindow(tk.Frame):
         self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='Reference .hdf5 File',
                                      font=('Arial', 30))
 
+    def open_assign_window(self):
+        self.new_window = tk.Toplevel(self.master)
+        self.new_window.title('Assign Peaks')
+
+        self.frame_assign = ttk.Frame(self.new_window)
+        self.frame_assign.pack(fill=tk.BOTH, expand=True)
+
+        label_description = ttk.Label(self.frame_assign, text='適用したい場合はウィンドウを開いたままにしてください．')
+        label_index = ttk.Label(self.frame_assign, text='Index')
+        label_x = ttk.Label(self.frame_assign, text='x')
+        label_description.grid(row=0, column=0, columnspan=2)
+        label_index.grid(row=1, column=0)
+        label_x.grid(row=1, column=1)
+
+        self.refresh_assign_window()
+
+    def refresh_assign_window(self):
+        # clear
+        for w in self.widgets_assign.values():
+            for ww in w:
+                ww.destroy()
+        self.widgets_assign = {}
+        # create
+        self.calibrator.set_material(self.material.get())
+        x_true = self.calibrator.get_true_x()
+        auto_x_true = self.assign_peaks_automatically()
+        for i, (r, auto) in enumerate(zip(self.ranges, auto_x_true)):
+            label_index = ttk.Label(self.frame_assign, text=str(self.ranges.index(r)))
+            combobox_x = ttk.Combobox(self.frame_assign, values=list(x_true), justify=tk.CENTER)
+            combobox_x.set(auto)
+            label_index.grid(row=i + 2, column=0)
+            combobox_x.grid(row=i + 2, column=1)
+            self.widgets_assign[i] = (label_index, combobox_x)
+
+    def assign_peaks_automatically(self):
+        x_true = self.calibrator.get_true_x()
+        found_x_true = []
+        for x0, y0, x1, y1 in self.ranges:
+            x_mid = (x0 + x1) / 2
+            diff = np.abs(x_true - x_mid)
+            idx = np.argmin(diff)
+            found_x_true.append(x_true[idx])
+        return found_x_true
+
+    def assign_peaks(self):
+        if self.new_window is None or not self.new_window.winfo_exists():
+            return self.assign_peaks_automatically()
+        assigned_x_true = []
+        for widgets in self.widgets_assign.values():
+            x = widgets[1].get()
+            assigned_x_true.append(float(x))
+        return assigned_x_true
+
     def calibrate(self) -> None:
         self.calibrator.set_dimension(int(self.dimension.get()[0]))
         self.calibrator.set_material(self.material.get())
         self.calibrator.set_function(self.function.get())
         self.calibrator.reset_data()
-        ok = self.calibrator.calibrate()
+        ok = self.calibrator.calibrate(mode='manual', ranges=self.ranges, x_true=self.assign_peaks())
         if not ok:
             messagebox.showerror('Error', 'Peaks not found.')
             return
         self.ax[1].cla()
+        for r in self.rectangles:
+            self.ax[1].add_patch(r)
         self.calibrator.show_fit_result(self.ax[1])
         self.canvas.draw()
         self.line = None
+        self.showing_ref = True
 
     def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # クリックした点のスペクトルを表示する
@@ -260,12 +335,19 @@ class MainWindow(tk.Frame):
         else:
             self.ax[1].cla()
 
+        for rect in self.rectangles:
+            self.ax[1].add_patch(rect)
+        for text in self.texts:
+            self.ax[1].add_artist(text)
+
         self.line = self.ax[1].plot(
             self.calibrator.xdata,
             self.calibrator.ydata,
             label=self.material.get(), color='k')
         self.ax[1].legend()
         self.canvas.draw()
+
+        self.showing_ref = True
 
     def update_plot(self) -> None:
         # マッピング上のクロスヘアを移動
@@ -276,21 +358,20 @@ class MainWindow(tk.Frame):
         if not (0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]):
             return
 
-        if self.autoscale.get():
+        if self.showing_ref or self.line is None or self.autoscale.get():
             plt.autoscale(True)
             self.ax[1].cla()
         else:
-            if self.line is not None:
-                plt.autoscale(False)  # The very first time requires autoscale
-                self.line[0].remove()
-            else:  # for after calibration
-                self.ax[1].cla()
+            plt.autoscale(False)  # The very first time requires autoscale
+            self.line[0].remove()
         self.line = self.ax[1].plot(
             self.calibrator.xdata,
             self.calibrator.map_data[self.row][self.col],
             label=f'({self.col}, {self.row})', color='r', linewidth=0.8)
         self.ax[1].legend(fontsize=18)
         self.canvas.draw()
+
+        self.showing_ref = False
 
     def update_selection(self):
         for r in self.selection_patches:
@@ -353,6 +434,10 @@ class MainWindow(tk.Frame):
                 if material in filename:
                     self.material.set(material)
             self.button_calibrate.config(state=tk.ACTIVE)
+            self.rectangles = []
+            self.texts = []
+            self.ranges = []
+            self.refresh_assign_window()
             self.show_ref()
             self.tooltip_ref.set(filename)
         else:  # raw data
@@ -467,6 +552,98 @@ class MainWindow(tk.Frame):
 
                 for x, y in zip(xdata, spectrum):
                     f.write(f'{x},{y}\n')
+
+    def on_press(self, event):
+        if event.xdata is None or event.ydata is None:
+            return
+        if event.inaxes == self.ax[0]:
+            return
+        if not self.showing_ref:
+            return
+        # Toolbarのズーム機能を使っている状態では動作しないようにする
+        if self.toolbar._buttons['Zoom'].var.get():
+            return
+        self.x0 = event.xdata
+        self.y0 = event.ydata
+
+        self.drawing = True
+
+    def on_release(self, event):
+        if event.xdata is None or event.ydata is None:
+            return
+        if event.inaxes == self.ax[0]:
+            return
+        if not self.showing_ref:
+            return
+        # Toolbarのズーム機能を使っている状態では動作しないようにする
+        if self.toolbar._buttons['Zoom'].var.get():
+            return
+
+        # プレビュー用の矩形を消す
+        if self.rect_drawing is not None:
+            self.rect_drawing.remove()
+            self.rect_drawing = None
+
+        self.drawing = False
+
+        self.x1 = event.xdata
+        self.y1 = event.ydata
+        if self.x0 == self.x1 or self.y0 == self.y1:
+            return
+        if self.is_overlapped(self.x0, self.x1):
+            messagebox.showerror('Error', 'Overlapped.')
+            return
+        x0, x1 = sorted([self.x0, self.x1])
+        y0, y1 = sorted([self.y0, self.y1])
+        r = patches.Rectangle((x0, y0), x1 - x0, y1 - y0, linewidth=1, edgecolor='r',
+                              facecolor='none')
+        self.ax[1].add_patch(r)
+        t = self.ax[1].text(x1, y1, str(len(self.rectangles)), color='r', fontsize=20)
+        self.rectangles.append(r)
+        self.texts.append(t)
+        self.ranges.append((x0, y0, x1, y1))
+        self.canvas.draw()
+        if self.new_window is not None and self.new_window.winfo_exists():
+            self.refresh_assign_window()
+
+    def draw_preview(self, event):
+        if event.xdata is None or event.ydata is None:
+            return
+        if event.inaxes == self.ax[0]:
+            return
+        if not self.showing_ref:
+            return
+        if not self.drawing:
+            return
+        # Toolbarのズーム機能を使っている状態では動作しないようにする
+        if self.toolbar._buttons['Zoom'].var.get():
+            return
+        if self.rect_drawing is not None:
+            self.rect_drawing.remove()
+        x1 = event.xdata
+        y1 = event.ydata
+        self.rect_drawing = patches.Rectangle((self.x0, self.y0), x1 - self.x0, y1 - self.y0, linewidth=0.5,
+                                              edgecolor='r', linestyle='dashed', facecolor='none')
+        self.ax[1].add_patch(self.rect_drawing)
+        self.canvas.draw()
+
+    def is_overlapped(self, x0, x1):
+        for x0_, y0_, x1_, y1_ in self.ranges:
+            if x0_ <= x0 <= x1_ or x0_ <= x1 <= x1_:
+                return True
+            if x0 <= x0_ <= x1 or x0 <= x1_ <= x1:
+                return True
+        return False
+
+    def undo(self, event):
+        if len(self.rectangles) == 0:
+            return
+        self.rectangles[-1].remove()
+        self.rectangles.pop()
+        self.texts[-1].remove()
+        self.texts.pop()
+        self.ranges.pop()
+        self.canvas.draw()
 
     def quit(self) -> None:
         self.calibrator.close()

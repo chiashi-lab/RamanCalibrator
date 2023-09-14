@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from dataloader import RamanHDFReader
+from dataloader import RamanHDFReader, DataLoader
 from calibrator import Calibrator
 
 
@@ -49,16 +49,13 @@ class RamanCalibrator(Calibrator):
     def load_ref(self, filename: str) -> None:
         # 標準サンプルのファイルを読み込む
         self.reader_ref = RamanHDFReader(filename)
-        if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
-            self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
-            print('Reference data is supposed to be single measurement, but map data was loaded.')
-        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
+        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra[0][0][0])
 
     def reset_data(self):
         # キャリブレーションを複数かけることのないよう、毎度リセットをかける
         if self.reader_raw is None or self.reader_ref is None:
             raise ValueError('Load data before reset.')
-        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
+        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra[0][0][0])
 
     def imshow(self, ax: plt.Axes, map_range: list, cmap: str) -> None:
         if self.reader_raw is None:
