@@ -61,7 +61,9 @@ class RamanCalibrator(Calibrator):
         if self.reader_raw is None:
             raise ValueError('Load data before imshow.')
         # マッピングの表示
-        extent_mapping = (self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
+        extent_mapping = (
+            self.x_start, self.x_start + self.x_span + self.x_pad,
+            self.y_start, self.y_start + self.y_span + self.y_pad)
         map_range_idx = (map_range[0] < self.xdata) & (self.xdata < map_range[1])
         data = self.map_data[:, :, map_range_idx]
         if data.shape[2] == 0:
