@@ -82,7 +82,8 @@ class RamanCalibrator(Calibrator):
 
     def is_inside(self, x: float, y: float) -> bool:
         # check if the selected position is inside the mapping
-        if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start <= y <= self.y_start + self.y_span):
+        if ((self.x_start <= x <= self.x_start + self.x_span + self.x_pad)
+                and (self.y_start <= y <= self.y_start + self.y_span + self.y_pad)):
             return True
         else:
             return False
