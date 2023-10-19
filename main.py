@@ -184,9 +184,9 @@ class MainWindow(tk.Frame):
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
         self.canvas_drop.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 2, fill='lightgray')
         self.canvas_drop.create_rectangle(0, self.height_canvas / 2, self.width_canvas, self.height_canvas, fill='gray')
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 4, text='2D Map .wdf File',
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 4, text='① 2D Map .wdf File',
                                      font=('Arial', 30))
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='Reference .wdf File',
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='② Reference .wdf File',
                                      font=('Arial', 30))
 
     def calibrate(self) -> None:
@@ -350,7 +350,10 @@ class MainWindow(tk.Frame):
             threshold = 0.5
 
         if dropped_place > threshold:  # reference data
-            self.calibrator.load_ref(filename)
+            has_same_xdata = self.calibrator.load_ref(filename)
+            if not has_same_xdata:
+                messagebox.showerror('Error', 'X-axis data does not match. Choose reference data with same measurement condition as the map data.')
+                return
             self.filename_ref.set(os.path.basename(filename))
             self.folder_ref = os.path.dirname(filename)
             for material in self.calibrator.get_material_list():

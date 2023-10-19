@@ -46,13 +46,24 @@ class RenishawCalibrator(Calibrator):
         self.y_span = self.reader_raw.map_info['y_span']
         return True
 
-    def load_ref(self, filename: str) -> None:
+    def load_ref(self, filename: str) -> bool:
         # 標準サンプルのファイルを読み込む
         self.reader_ref = WDFReader(filename)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
             self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
             print('Reference data is supposed to be single measurement, but map data was loaded.')
+        if not self.is_xdata_correct():
+            return False
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
+        return True
+
+    def is_xdata_correct(self):
+        if self.reader_raw is None:
+            return True
+        # xdataが同じかどうか確認する
+        if not np.all(self.reader_raw.xdata == self.reader_ref.xdata):
+            return False
+        return True
 
     def reset_data(self):
         # キャリブレーションを複数かけることのないよう、毎度リセットをかける
