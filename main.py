@@ -68,6 +68,7 @@ class MainWindow(tk.Frame):
 
         self.folder_raw = './'
         self.folder_ref = './'
+        self.folder_bg = './'
 
         self.create_widgets()
 
@@ -113,14 +114,20 @@ class MainWindow(tk.Frame):
         # frame_data
         label_raw = ttk.Label(frame_data, text='Raw:')
         label_ref = ttk.Label(frame_data, text='Reference:')
+        label_bg = ttk.Label(frame_data, text='Background:')
         self.filename_raw = tk.StringVar(value='please drag & drop!')
         self.filename_ref = tk.StringVar(value='please drag & drop!')
+        self.filename_bg = tk.StringVar(value='please drag & drop!')
         label_filename_raw = ttk.Label(frame_data, textvariable=self.filename_raw)
         label_filename_ref = ttk.Label(frame_data, textvariable=self.filename_ref)
+        label_filename_bg = ttk.Label(frame_data, textvariable=self.filename_bg)
         self.tooltip_raw = MyTooltip(label_filename_raw, '')
         self.tooltip_ref = MyTooltip(label_filename_ref, '')
+        self.tooltip_bg = MyTooltip(label_filename_bg, '')
         label_ref.bind('<Button-1>', self.show_ref)
         label_filename_ref.bind('<Button-1>', self.show_ref)
+        label_bg.bind('<Button-1>', self.show_bg)
+        label_filename_bg.bind('<Button-1>', self.show_bg)
         self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
         self.dimension = tk.StringVar(value=self.calibrator.get_dimension_list()[0])
         self.function = tk.StringVar(value=self.calibrator.get_function_list()[0])
@@ -130,17 +137,25 @@ class MainWindow(tk.Frame):
         optionmenu_material['menu'].config(font=font_md)
         optionmenu_dimension['menu'].config(font=font_md)
         optionmenu_function['menu'].config(font=font_md)
-        button_assign_manually = ttk.Button(frame_data, text='ASSIGN', command=self.open_assign_window)
+        button_assign_manually = ttk.Button(frame_data, text='ASSIGN', command=self.open_assign_window, takefocus=False)
         self.button_calibrate = ttk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED, takefocus=False)
+        self.if_correct_bg = tk.BooleanVar(value=False)
+        checkbox_correct_bg = ttk.Checkbutton(frame_data, text='Correct Background', variable=self.if_correct_bg, command=self.handle_bg_and_crr, takefocus=False)
+        self.if_remove_cosmic_ray = tk.BooleanVar(value=False)
+        checkbox_remove_cosmic_ray = ttk.Checkbutton(frame_data, text='Remove Cosmic Ray', variable=self.if_remove_cosmic_ray, command=self.handle_bg_and_crr, takefocus=False)
         label_raw.grid(row=0, column=0)
         label_filename_raw.grid(row=0, column=1, columnspan=2)
         label_ref.grid(row=1, column=0)
         label_filename_ref.grid(row=1, column=1, columnspan=2)
-        optionmenu_material.grid(row=2, column=0)
-        optionmenu_dimension.grid(row=2, column=1)
-        optionmenu_function.grid(row=2, column=2)
-        button_assign_manually.grid(row=3, column=0)
-        self.button_calibrate.grid(row=3, column=1, columnspan=2)
+        label_bg.grid(row=2, column=0)
+        label_filename_bg.grid(row=2, column=1, columnspan=2)
+        optionmenu_material.grid(row=3, column=0)
+        optionmenu_dimension.grid(row=3, column=1)
+        optionmenu_function.grid(row=3, column=2)
+        button_assign_manually.grid(row=4, column=0)
+        self.button_calibrate.grid(row=4, column=1, columnspan=2)
+        checkbox_correct_bg.grid(row=5, column=0, columnspan=3)
+        checkbox_remove_cosmic_ray.grid(row=6, column=0, columnspan=3)
 
         # frame_download
         self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
@@ -160,7 +175,7 @@ class MainWindow(tk.Frame):
         self.button_delete_all = ttk.Button(frame_download, text='DELETE ALL', command=self.delete_all, takefocus=False)
         self.button_save = ttk.Button(frame_download, text='SAVE', command=self.save, takefocus=False)
         self.show_selection_in_map = tk.BooleanVar(value=True)
-        checkbox_show_selection_in_map = ttk.Checkbutton(frame_download, text='Show in Map', variable=self.show_selection_in_map, command=self.update_selection)
+        checkbox_show_selection_in_map = ttk.Checkbutton(frame_download, text='Show in Map', variable=self.show_selection_in_map, command=self.update_selection, takefocus=False)
         self.treeview.grid(row=0, column=0, columnspan=3)
         self.button_add.grid(row=1, column=0)
         self.button_delete.grid(row=2, column=0)
@@ -201,12 +216,12 @@ class MainWindow(tk.Frame):
 
         # canvas_drop
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
-        self.canvas_drop.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 2, fill='lightgray')
-        self.canvas_drop.create_rectangle(0, self.height_canvas / 2, self.width_canvas, self.height_canvas, fill='gray')
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 4, text='2D Map .hdf5 File',
-                                     font=('Arial', 30))
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='Reference .hdf5 File',
-                                     font=('Arial', 30))
+        self.canvas_drop.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 3, fill='lightgray')
+        self.canvas_drop.create_rectangle(0, self.height_canvas / 3, self.width_canvas, self.height_canvas * 2 / 3, fill='gray')
+        self.canvas_drop.create_rectangle(0, self.height_canvas * 2 / 3, self.width_canvas, self.height_canvas, fill='darkgray')
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 6, text='2D Map .hdf5 File', font=('Arial', 30))
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 2, text='Reference .hdf5 File', font=('Arial', 30))
+        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 5 / 6, text='Background .hdf5 File', font=('Arial', 30))
 
     def open_assign_window(self):
         self.new_window = tk.Toplevel(self.master)
@@ -278,6 +293,40 @@ class MainWindow(tk.Frame):
         self.line = None
         self.showing_ref = True
 
+    def handle_bg_and_crr(self):
+        # 必ずCRRのあとにbgの処理を行う
+        if self.if_remove_cosmic_ray.get():
+            self.remove_cosmic_ray()
+        else:
+            self.undo_remove_cosmic_ray()
+
+        if self.if_correct_bg.get():
+            self.subtract_bg()
+        else:
+            self.undo_subtract_bg()
+
+    def subtract_bg(self):
+        try:
+            self.calibrator.subtract_bg()
+        except ValueError as e:
+            messagebox.showerror('Error', str(e))
+        self.imshow()
+
+    def undo_subtract_bg(self):
+        self.calibrator.undo_subtract_bg()
+        self.imshow()
+
+    def remove_cosmic_ray(self):
+        try:
+            self.calibrator.remove_cosmic_ray(0.2)
+        except ValueError as e:
+            messagebox.showerror('Error', str(e))
+        self.imshow()
+
+    def undo_remove_cosmic_ray(self):
+        self.calibrator.undo_remove_cosmic_ray()
+        self.imshow()
+
     def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # クリックした点のスペクトルを表示する
         if self.filename_raw.get() == 'please drag & drop!':
@@ -324,7 +373,7 @@ class MainWindow(tk.Frame):
             self.update_plot()
             self.update_selection()
         except ValueError as e:
-            print('ValueError', e)
+            messagebox.showerror('Error', str(e))
 
     def show_ref(self, event=None):
         if self.filename_ref.get() == 'please drag & drop!':
@@ -348,6 +397,27 @@ class MainWindow(tk.Frame):
         self.canvas.draw()
 
         self.showing_ref = True
+
+    def show_bg(self, event=None):
+        if self.filename_bg.get() == 'please drag & drop!':
+            return
+        plt.autoscale(True)
+        if self.line is not None:
+            self.line[0].remove()
+        else:
+            self.ax[1].cla()
+
+        for rect in self.rectangles:
+            self.ax[1].add_patch(rect)
+        for text in self.texts:
+            self.ax[1].add_artist(text)
+
+        self.line = self.ax[1].plot(
+            self.calibrator.xdata,
+            self.calibrator.bg_data,
+            label='Background', color='k')
+        self.ax[1].legend()
+        self.canvas.draw()
 
     def update_plot(self) -> None:
         # マッピング上のクロスヘアを移動
@@ -422,11 +492,17 @@ class MainWindow(tk.Frame):
         dropped_place = (event.y_root - master_geometry[1] - 30) / self.height_canvas
 
         if os.name == 'posix':
-            threshold = 1
+            threshold = 2 / 3
         else:
-            threshold = 0.5
+            threshold = 1 / 3
 
-        if dropped_place > threshold:  # reference data
+        if dropped_place > threshold * 2:  # background data
+            self.calibrator.load_bg(filename)
+            self.filename_bg.set(os.path.basename(filename))
+            self.folder_bg = os.path.dirname(filename)
+            self.show_bg()
+            self.tooltip_bg.set(filename)
+        elif dropped_place > threshold:  # reference data
             self.calibrator.load_ref(filename)
             self.filename_ref.set(os.path.basename(filename))
             self.folder_ref = os.path.dirname(filename)
@@ -463,11 +539,14 @@ class MainWindow(tk.Frame):
 
     def reset(self) -> None:
         # マッピングデータのリセット
-        self.calibrator.reset()
+        self.calibrator.clear()
+        self.if_correct_bg.set(False)
         self.filename_raw.set('please drag & drop!')
         self.filename_ref.set('please drag & drop!')
+        self.filename_bg.set('please drag & drop!')
         self.folder_raw = './'
         self.folder_ref = './'
+        self.folder_bg = './'
         self.button_calibrate.config(state=tk.DISABLED)
         self.button_apply.config(state=tk.DISABLED)
         self.optionmenu_map_range.config(state=tk.DISABLED)
