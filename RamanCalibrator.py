@@ -9,7 +9,7 @@ def subtract_baseline(data: np.ndarray):
     return data - baseline
 
 
-def remove_cosmic_ray(spectra: np.ndarray, threshold: float = 0.2):
+def remove_cosmic_ray(spectra: np.ndarray, threshold: float):
     mean = spectra.mean(axis=2)
     std = spectra.std()
     deviation = (spectra - mean[:, :, np.newaxis, :]) / std
@@ -72,7 +72,15 @@ class RamanCalibrator(Calibrator):
     def load_bg(self, filename: str) -> None:
         # 背景のファイルを読み込む
         self.reader_bg = RamanHDFReader(filename)
-        self.bg_data = self.reader_bg.spectra[0][0][0]
+        bg_data = self.reader_bg.spectra
+        if bg_data.shape[2] < 3:
+            self.bg_data = bg_data.sum(axis=0)[0][0]
+        else:
+            self.bg_data = remove_cosmic_ray(bg_data, 0.2).mean(axis=2)[0][0]
+
+        # refがまだ読み込まれていない場合はbgのxdataを使う
+        if self.xdata is None:
+            self.xdata = self.reader_bg.xdata
 
     def reset_data(self):
         # キャリブレーションを複数かけることのないよう、毎度リセットをかける
@@ -99,6 +107,8 @@ class RamanCalibrator(Calibrator):
             raise ValueError('Load data before removing cosmic ray.')
         if self.cosmic_ray_removed:
             return
+        if self.map_data.shape[2] < 3:
+            raise ValueError('Cosmic ray removal is not available for single acquisition.')
         self.map_data = remove_cosmic_ray(self.reader_raw.spectra, threshold).mean(axis=2).transpose(1, 0, 2)
         self.subtracted = False
         self.cosmic_ray_removed = True

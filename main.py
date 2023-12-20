@@ -143,19 +143,22 @@ class MainWindow(tk.Frame):
         checkbox_correct_bg = ttk.Checkbutton(frame_data, text='Correct Background', variable=self.if_correct_bg, command=self.handle_bg_and_crr, takefocus=False)
         self.if_remove_cosmic_ray = tk.BooleanVar(value=False)
         checkbox_remove_cosmic_ray = ttk.Checkbutton(frame_data, text='Remove Cosmic Ray', variable=self.if_remove_cosmic_ray, command=self.handle_bg_and_crr, takefocus=False)
+        self.crr_threshold = tk.DoubleVar(value=0.01)
+        entry_crr_threshold = ttk.Entry(frame_data, textvariable=self.crr_threshold, justify=tk.CENTER, font=font_md, width=6, takefocus=False)
         label_raw.grid(row=0, column=0)
         label_filename_raw.grid(row=0, column=1, columnspan=2)
         label_ref.grid(row=1, column=0)
         label_filename_ref.grid(row=1, column=1, columnspan=2)
         label_bg.grid(row=2, column=0)
         label_filename_bg.grid(row=2, column=1, columnspan=2)
-        optionmenu_material.grid(row=3, column=0)
+        optionmenu_material.grid(row=3, column=0, sticky=tk.EW)
         optionmenu_dimension.grid(row=3, column=1)
         optionmenu_function.grid(row=3, column=2)
-        button_assign_manually.grid(row=4, column=0)
-        self.button_calibrate.grid(row=4, column=1, columnspan=2)
-        checkbox_correct_bg.grid(row=5, column=0, columnspan=3)
-        checkbox_remove_cosmic_ray.grid(row=6, column=0, columnspan=3)
+        button_assign_manually.grid(row=4, column=0, sticky=tk.EW)
+        self.button_calibrate.grid(row=4, column=1, columnspan=2, sticky=tk.EW)
+        checkbox_correct_bg.grid(row=5, column=0, columnspan=2)
+        checkbox_remove_cosmic_ray.grid(row=6, column=0, columnspan=2)
+        entry_crr_threshold.grid(row=6, column=2)
 
         # frame_download
         self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
@@ -318,7 +321,8 @@ class MainWindow(tk.Frame):
 
     def remove_cosmic_ray(self):
         try:
-            self.calibrator.remove_cosmic_ray(0.2)
+            threshold = self.crr_threshold.get()
+            self.calibrator.remove_cosmic_ray(threshold)
         except ValueError as e:
             messagebox.showerror('Error', str(e))
         self.imshow()
