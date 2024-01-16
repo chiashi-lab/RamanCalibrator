@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from dataloader import RamanHDFReader, DataLoader
+from matplotlib.colors import Normalize
+from dataloader import RamanHDFReader
 from calibrator import Calibrator
 
 
@@ -120,7 +121,7 @@ class RamanCalibrator(Calibrator):
         self.subtracted = False
         self.cosmic_ray_removed = False
 
-    def imshow(self, ax: plt.Axes, map_range: list, cmap: str) -> None:
+    def imshow(self, ax: plt.Axes, map_range: list, cmap: str, cmap_range: list[float]) -> None:
         if self.reader_raw is None:
             raise ValueError('Load data before imshow.')
         # マッピングの表示
@@ -133,7 +134,7 @@ class RamanCalibrator(Calibrator):
             return
         data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
         # 光学像の上にマッピングを描画
-        ax.imshow(data, alpha=0.9, extent=extent_mapping, origin='lower', cmap=cmap)
+        ax.imshow(data, alpha=1, extent=extent_mapping, origin='lower', cmap=cmap, norm=Normalize(vmin=cmap_range[0], vmax=cmap_range[1]))
 
     def coord2idx(self, x_pos: float, y_pos: float) -> [int, int]:
         col = round((x_pos - self.x_start) // self.x_pad)

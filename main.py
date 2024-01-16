@@ -188,34 +188,52 @@ class MainWindow(tk.Frame):
         checkbox_show_selection_in_map.grid(row=3, column=0, columnspan=3)
 
         # frame plot
+        label_map_range = tk.Label(frame_plot, text='Map Range')
         self.map_range = tk.StringVar(value='G(1570~1610)')
-        self.optionmenu_map_range = ttk.OptionMenu(frame_plot, self.map_range, self.map_range.get(), 'G(1570~1610)', '2D(2550~2750)', command=self.change_map_range)
+        self.optionmenu_map_range = ttk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
+                                                   command=self.change_map_range)
         self.optionmenu_map_range.config(state=tk.DISABLED)
         self.optionmenu_map_range['menu'].config(font=font_md)
         self.map_range_1 = tk.DoubleVar(value=1570)
         self.map_range_2 = tk.DoubleVar(value=1610)
-        entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md, width=6)
-        entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md, width=6)
-        self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED, takefocus=False)
+        entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md,
+                                      width=6)
+        entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md,
+                                      width=6)
+        label_cmap_range = tk.Label(frame_plot, text='Color Range')
+        self.cmap_range_1 = tk.DoubleVar(value=0)
+        self.cmap_range_2 = tk.DoubleVar(value=10000)
+        entry_cmap_range_1 = tk.Entry(frame_plot, textvariable=self.cmap_range_1, justify=tk.CENTER, font=font_md,
+                                      width=6)
+        entry_cmap_range_2 = tk.Entry(frame_plot, textvariable=self.cmap_range_2, justify=tk.CENTER, font=font_md,
+                                      width=6)
+        self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED)
         self.map_color = tk.StringVar(value='hot')
+        label_map_color = tk.Label(frame_plot, text='Color Map')
         self.optionmenu_map_color = ttk.OptionMenu(frame_plot, self.map_color, self.map_color.get(),
-                                           *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
-                                                    'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
-                                                    'gray', 'pink', 'spring', 'summer', 'autumn', 'winter',
-                                                    'RdBu', 'Spectral', 'bwr', 'coolwarm', 'hsv', 'twilight',
-                                                    'CMRmap', 'cubehelix', 'brg', 'gist_rainbow', 'rainbow',
-                                                    'jet', 'nipy_spectral', 'gist_ncar']),
+                                                   *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
+                                                            'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
+                                                            'gray', 'pink', 'spring', 'summer', 'autumn', 'winter',
+                                                            'RdBu', 'Spectral', 'bwr', 'coolwarm', 'hsv', 'twilight',
+                                                            'CMRmap', 'cubehelix', 'brg', 'gist_rainbow', 'rainbow',
+                                                            'jet', 'nipy_spectral', 'gist_ncar']),
                                                    command=self.imshow)
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.optionmenu_map_color['menu'].config(font=font_md)
         self.autoscale = tk.BooleanVar(value=True)
-        checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale, takefocus=False)
-        self.optionmenu_map_range.grid(row=0, column=0, columnspan=2, sticky=tk.EW)
-        entry_map_range_1.grid(row=1, column=0)
-        entry_map_range_2.grid(row=1, column=1)
-        self.button_apply.grid(row=0, column=2, rowspan=3, sticky=tk.NS)
-        self.optionmenu_map_color.grid(row=2, column=0, columnspan=2, sticky=tk.EW)
-        checkbox_autoscale.grid(row=3, column=0, columnspan=3)
+        checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
+
+        label_map_range.grid(row=0, column=0, rowspan=2)
+        self.optionmenu_map_range.grid(row=0, column=1, columnspan=2, sticky=tk.EW)
+        self.button_apply.grid(row=0, column=3, rowspan=4, sticky=tk.NS)
+        entry_map_range_1.grid(row=1, column=1)
+        entry_map_range_2.grid(row=1, column=2)
+        label_cmap_range.grid(row=2, column=0)
+        entry_cmap_range_1.grid(row=2, column=1)
+        entry_cmap_range_2.grid(row=2, column=2)
+        label_map_color.grid(row=3, column=0)
+        self.optionmenu_map_color.grid(row=3, column=1, columnspan=2, sticky=tk.EW)
+        checkbox_autoscale.grid(row=4, column=0, columnspan=4)
 
         # canvas_drop
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
@@ -373,7 +391,11 @@ class MainWindow(tk.Frame):
         self.horizontal_line = self.ax[0].axhline(color='k', lw=1, ls='--')
         self.vertical_line = self.ax[0].axvline(color='k', lw=1, ls='--')
         try:
-            self.calibrator.imshow(self.ax[0], [self.map_range_1.get(), self.map_range_2.get()], self.map_color.get())
+            self.calibrator.imshow(
+                self.ax[0],
+                [self.map_range_1.get(), self.map_range_2.get()],
+                self.map_color.get(),
+                [self.cmap_range_1.get(), self.cmap_range_2.get()])
             self.update_plot()
             self.update_selection()
         except ValueError as e:
