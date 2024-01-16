@@ -1,6 +1,7 @@
 import numpy as np
-import PIL
+from PIL import Image
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 from renishawWiRE import WDFReader
 from calibrator import Calibrator
 
@@ -71,14 +72,14 @@ class RenishawCalibrator(Calibrator):
             raise ValueError('Load data before reset.')
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
-    def imshow(self, ax: plt.Axes, map_range: list, cmap: str) -> None:
+    def imshow(self, ax: plt.Axes, map_range: list, cmap: str, cmap_range: list[float], alpha: float) -> None:
         if self.reader_raw is None:
             raise ValueError('Load data before imshow.')
         # マッピングの表示
         # 光学像の位置、サイズを取り出す
         img_x0, img_y0 = self.reader_raw.img_origins
         img_w, img_h = self.reader_raw.img_dimensions
-        img = PIL.Image.open(self.reader_raw.img)
+        img = Image.open(self.reader_raw.img)
         extent_optical = (img_x0, img_x0 + img_w, img_y0 + img_h, img_y0)
         ax.set_xlim(img_x0, img_x0 + img_w)
         ax.set_ylim(img_y0 + img_h, img_y0)
@@ -93,7 +94,7 @@ class RenishawCalibrator(Calibrator):
         data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
         data = data.reshape(data.shape[::-1]).T
         # 光学像の上にマッピングを描画
-        ax.imshow(data, alpha=0.9, extent=extent_mapping, origin='lower', cmap=cmap)
+        ax.imshow(data, alpha=alpha, extent=extent_mapping, origin='lower', cmap=cmap, norm=Normalize(vmin=cmap_range[0], vmax=cmap_range[1]))
 
     def col2row(self, row: int, col: int) -> [int, int]:
         idx = col * self.shape[0] + row
