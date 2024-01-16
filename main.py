@@ -184,12 +184,7 @@ class MainWindow(tk.Frame):
         entry_alpha = tk.Entry(frame_plot, textvariable=self.alpha, justify=tk.CENTER, font=font_md, width=6)
         self.autoscale = tk.BooleanVar(value=True)
         checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
-        # self.optionmenu_map_range.grid(row=0, column=0, columnspan=2, sticky=tk.EW)
-        # entry_map_range_1.grid(row=1, column=0)
-        # entry_map_range_2.grid(row=1, column=1)
-        # self.button_apply.grid(row=0, column=2, rowspan=3, sticky=tk.NS)
-        # self.optionmenu_map_color.grid(row=2, column=0, columnspan=2, sticky=tk.EW)
-        # checkbox_autoscale.grid(row=3, column=0, columnspan=3)
+
         label_map_range.grid(row=0, column=0, rowspan=2)
         self.optionmenu_map_range.grid(row=0, column=1, columnspan=2, sticky=tk.EW)
         self.button_apply.grid(row=0, column=3, rowspan=5, sticky=tk.NS)
