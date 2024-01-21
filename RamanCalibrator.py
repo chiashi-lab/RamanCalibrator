@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-from dataloader import RamanHDFReader
+from dataloader import RamanHDFReader, RamanHDFWriter
 from calibrator import Calibrator
 
 
@@ -83,10 +83,37 @@ class RamanCalibrator(Calibrator):
         if self.xdata is None:
             self.xdata = self.reader_bg.xdata
 
+    def save_pre_calibrated(self, filename: str) -> None:
+        # キャリブレーションを保存する
+        self.writer_pre_calibrated = RamanHDFWriter(filename)
+        # abs_path_ref
+        # calibration
+        self.writer_pre_calibrated.create_attr('abs_path_ref', self.reader_ref.path)
+        self.writer_pre_calibrated.create_attr('calibration_info', self.calibration_info.__repr__())
+        self.writer_pre_calibrated.create_attr('time', self.reader_ref.time)
+        self.writer_pre_calibrated.create_attr('integration', self.reader_ref.integration)
+        self.writer_pre_calibrated.create_attr('accumulation', self.reader_ref.accumulation)
+        self.writer_pre_calibrated.create_attr('pixel_size', self.reader_ref.pixel_size)
+        self.writer_pre_calibrated.create_attr('shape', self.reader_ref.shape)
+        self.writer_pre_calibrated.create_attr('x_start', self.reader_ref.map_info['x_start'])
+        self.writer_pre_calibrated.create_attr('y_start', self.reader_ref.map_info['y_start'])
+        self.writer_pre_calibrated.create_attr('x_pad', self.reader_ref.map_info['x_pad'])
+        self.writer_pre_calibrated.create_attr('y_pad', self.reader_ref.map_info['y_pad'])
+        self.writer_pre_calibrated.create_attr('x_span', self.reader_ref.map_info['x_span'])
+        self.writer_pre_calibrated.create_attr('y_span', self.reader_ref.map_info['y_span'])
+        self.writer_pre_calibrated.create_dataset('xdata', self.xdata)
+        self.writer_pre_calibrated.create_dataset('spectra', self.ydata)
+        self.writer_pre_calibrated.close()
+
+    def load_pre_calibrated(self, filename: str) -> None:
+        # 事前にキャリブレーションされたファイルを読み込む
+        self.reader_pre_calibrated = RamanHDFReader(filename)
+        self.set_data(self.reader_pre_calibrated.xdata, self.reader_pre_calibrated.spectra)
+
     def reset_data(self):
         # キャリブレーションを複数かけることのないよう、毎度リセットをかける
         if self.reader_raw is None or self.reader_ref is None:
-            raise ValueError('Load data before reset.')
+            raise ValueError('Load raw data before reset.')
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra[0][0][0])
 
     def subtract_bg(self):

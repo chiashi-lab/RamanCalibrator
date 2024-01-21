@@ -95,21 +95,23 @@ class MainWindow(tk.Frame):
         fig.canvas.mpl_connect('motion_notify_event', self.draw_preview)
         fig.canvas.mpl_connect('button_release_event', self.on_release)
         self.canvas = FigureCanvasTkAgg(fig, self.master)
-        self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=3)
+        self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=4)
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
         self.toolbar.update()
-        self.toolbar.grid(row=3, column=0)
+        self.toolbar.grid(row=4, column=0)
         fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.canvas.mpl_connect('key_press_event', self.key_pressed)
         self.canvas.mpl_connect('key_press_event', key_press_handler)
 
         # frames
         frame_data = ttk.LabelFrame(self.master, text='Data')
+        frame_pre = ttk.LabelFrame(self.master, text='Pre-Calibrated')
         frame_download = ttk.LabelFrame(self.master, text='Download')
         frame_plot = ttk.LabelFrame(self.master, text='Plot')
         frame_data.grid(row=0, column=1)
-        frame_download.grid(row=1, column=1)
-        frame_plot.grid(row=2, column=1)
+        frame_pre.grid(row=1, column=1)
+        frame_download.grid(row=2, column=1)
+        frame_plot.grid(row=3, column=1)
 
         # frame_data
         label_raw = ttk.Label(frame_data, text='Raw:')
@@ -159,6 +161,11 @@ class MainWindow(tk.Frame):
         checkbox_correct_bg.grid(row=5, column=0, columnspan=2)
         checkbox_remove_cosmic_ray.grid(row=6, column=0, columnspan=2)
         entry_crr_threshold.grid(row=6, column=2)
+
+        button_save_pre_calibrated = ttk.Button(frame_pre, text='SAVE PRE-CALIBRATED X', command=self.save_pre_calibrated, width=20, takefocus=False)
+        button_load_pre_calibrated = ttk.Button(frame_pre, text='LOAD PRE-CALIBRATED X', command=self.load_pre_calibrated, width=20, takefocus=False)
+        button_save_pre_calibrated.grid(row=0, column=0, sticky=tk.EW)
+        button_load_pre_calibrated.grid(row=1, column=0, sticky=tk.EW)
 
         # frame_download
         self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
@@ -298,10 +305,14 @@ class MainWindow(tk.Frame):
         return assigned_x_true
 
     def calibrate(self) -> None:
-        self.calibrator.set_dimension(int(self.dimension.get()[0]))
-        self.calibrator.set_material(self.material.get())
-        self.calibrator.set_function(self.function.get())
-        self.calibrator.reset_data()
+        try:
+            self.calibrator.set_dimension(int(self.dimension.get()[0]))
+            self.calibrator.set_material(self.material.get())
+            self.calibrator.set_function(self.function.get())
+            self.calibrator.reset_data()
+        except ValueError as e:
+            messagebox.showerror('Error', str(e))
+            return
         ok = self.calibrator.calibrate(mode='manual', ranges=self.ranges, x_true=self.assign_peaks())
         if not ok:
             messagebox.showerror('Error', 'Peaks not found.')
@@ -313,6 +324,29 @@ class MainWindow(tk.Frame):
         self.canvas.draw()
         self.line = None
         self.showing_ref = True
+
+    def save_pre_calibrated(self, event=None) -> None:
+        try:
+            filename = filedialog.asksaveasfilename(initialdir=self.folder_raw, title='Save Pre-Calibrated X', filetypes=[('hdf5 file', '*.hdf5')], defaultextension='.hdf5')
+            if filename == '':
+                return
+            self.calibrator.save_pre_calibrated(filename)
+        except ValueError as e:
+            messagebox.showerror('Error', str(e))
+
+    def load_pre_calibrated(self, event=None) -> None:
+        try:
+            filename = filedialog.askopenfilename(initialdir=self.folder_raw, title='Load Pre-Calibrated X', filetypes=[('hdf5 file', '*.hdf5')])
+            if filename == '':
+                return
+            self.calibrator.load_pre_calibrated(filename)
+            abs_path_ref = self.calibrator.reader_pre_calibrated.file.attrs['abs_path_ref']
+            self.folder_ref = os.path.dirname(abs_path_ref)
+            self.filename_ref.set(os.path.basename(abs_path_ref))
+            self.calibrator.calibration_info = eval(self.calibrator.reader_pre_calibrated.file.attrs['calibration_info'])
+            self.imshow()
+        except ValueError as e:
+            messagebox.showerror('Error', str(e))
 
     def handle_bg_and_crr(self):
         # 必ずCRRのあとにbgの処理を行う
