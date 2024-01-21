@@ -143,7 +143,7 @@ class MainWindow(tk.Frame):
         self.button_calibrate = ttk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED, takefocus=False)
         self.if_correct_bg = tk.BooleanVar(value=False)
         checkbox_correct_bg = ttk.Checkbutton(frame_data, text='Correct Background', variable=self.if_correct_bg, command=self.handle_bg_and_crr, takefocus=False)
-        self.if_remove_cosmic_ray = tk.BooleanVar(value=False)
+        self.if_remove_cosmic_ray = tk.BooleanVar(value=True)
         checkbox_remove_cosmic_ray = ttk.Checkbutton(frame_data, text='Remove Cosmic Ray', variable=self.if_remove_cosmic_ray, command=self.handle_bg_and_crr, takefocus=False)
         self.crr_threshold = tk.DoubleVar(value=0.01)
         entry_crr_threshold = ttk.Entry(frame_data, textvariable=self.crr_threshold, justify=tk.CENTER, font=font_md, width=6, takefocus=False)
@@ -684,6 +684,9 @@ class MainWindow(tk.Frame):
             else:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
             filename = os.path.join(folder_to_save, f'{str(col)}_{str(row)}.txt')
+            if os.path.exists(filename):
+                if not messagebox.askyesno('Confirmation', f'{filename} already exists. Overwrite?'):
+                    continue
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
