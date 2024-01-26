@@ -104,7 +104,7 @@ class RenishawCalibrator(Calibrator):
         ax.set_ylim(img_y0 + img_h, img_y0)
         # まずは光学像を描画
         ax.imshow(self.img, extent=extent_optical)
-
+        # ラマンマッピングの描画
         extent_mapping = (self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
         map_range_idx = (map_range[0] < self.xdata) & (self.xdata < map_range[1])
         data = self.map_data[:, :, map_range_idx]
@@ -112,6 +112,8 @@ class RenishawCalibrator(Calibrator):
             return
         data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
         data = data.reshape(data.shape[::-1]).T
+        # カラーマップ範囲
+        cmap_range = [data.min(), data.max()] if cmap_range is None else cmap_range
         # 光学像の上にマッピングを描画
         ax.imshow(data, alpha=alpha, extent=extent_mapping, origin='lower', cmap=cmap, norm=Normalize(vmin=cmap_range[0], vmax=cmap_range[1]))
 

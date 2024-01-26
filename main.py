@@ -164,8 +164,8 @@ class MainWindow(tk.Frame):
         label_cmap_range = tk.Label(frame_plot, text='Color Range')
         self.cmap_range_1 = tk.DoubleVar(value=0)
         self.cmap_range_2 = tk.DoubleVar(value=10000)
-        entry_cmap_range_1 = tk.Entry(frame_plot, textvariable=self.cmap_range_1, justify=tk.CENTER, font=font_md, width=6)
-        entry_cmap_range_2 = tk.Entry(frame_plot, textvariable=self.cmap_range_2, justify=tk.CENTER, font=font_md, width=6)
+        self.entry_cmap_range_1 = tk.Entry(frame_plot, textvariable=self.cmap_range_1, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
+        self.entry_cmap_range_2 = tk.Entry(frame_plot, textvariable=self.cmap_range_2, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
         self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED)
         self.map_color = tk.StringVar(value='hot')
         label_map_color = tk.Label(frame_plot, text='Color Map')
@@ -182,8 +182,10 @@ class MainWindow(tk.Frame):
         label_alpha = tk.Label(frame_plot, text='Alpha')
         self.alpha = tk.DoubleVar(value=1)
         entry_alpha = tk.Entry(frame_plot, textvariable=self.alpha, justify=tk.CENTER, font=font_md, width=6)
-        self.autoscale = tk.BooleanVar(value=True)
-        checkbox_autoscale = ttk.Checkbutton(frame_plot, text='Auto Scale', variable=self.autoscale)
+        self.spec_autoscale = tk.BooleanVar(value=True)
+        checkbox_spec_autoscale = ttk.Checkbutton(frame_plot, text='Spectrum Auto Scale', variable=self.spec_autoscale)
+        self.map_autoscale = tk.BooleanVar(value=True)
+        checkbox_map_autoscale = ttk.Checkbutton(frame_plot, text='Color Map Auto Scale', variable=self.map_autoscale, command=self.on_map_autoscale)
 
         label_map_range.grid(row=0, column=0, rowspan=2)
         self.optionmenu_map_range.grid(row=0, column=1, columnspan=2, sticky=tk.EW)
@@ -191,13 +193,14 @@ class MainWindow(tk.Frame):
         entry_map_range_1.grid(row=1, column=1)
         entry_map_range_2.grid(row=1, column=2)
         label_cmap_range.grid(row=2, column=0)
-        entry_cmap_range_1.grid(row=2, column=1)
-        entry_cmap_range_2.grid(row=2, column=2)
+        self.entry_cmap_range_1.grid(row=2, column=1)
+        self.entry_cmap_range_2.grid(row=2, column=2)
         label_map_color.grid(row=3, column=0)
         self.optionmenu_map_color.grid(row=3, column=1, columnspan=2, sticky=tk.EW)
         label_alpha.grid(row=4, column=0)
         entry_alpha.grid(row=4, column=1)
-        checkbox_autoscale.grid(row=5, column=0, columnspan=4)
+        checkbox_map_autoscale.grid(row=5, column=0, columnspan=4)
+        checkbox_spec_autoscale.grid(row=6, column=0, columnspan=4)
 
         # canvas_drop
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
@@ -262,16 +265,25 @@ class MainWindow(tk.Frame):
             self.map_range_2.set(2750)
         self.imshow()
 
+    def on_map_autoscale(self, event=None) -> None:
+        if self.map_autoscale.get():
+            self.entry_cmap_range_1.config(state=tk.DISABLED)
+            self.entry_cmap_range_2.config(state=tk.DISABLED)
+        else:
+            self.entry_cmap_range_1.config(state=tk.NORMAL)
+            self.entry_cmap_range_2.config(state=tk.NORMAL)
+
     def imshow(self, event=None) -> None:
         self.ax[0].cla()
         self.horizontal_line = self.ax[0].axhline(color='k', lw=1, ls='--')
         self.vertical_line = self.ax[0].axvline(color='k', lw=1, ls='--')
         try:
+            cmap_range = [self.cmap_range_1.get(), self.cmap_range_2.get()] if not self.map_autoscale.get() else None
             self.calibrator.imshow(
                 self.ax[0],
                 [self.map_range_1.get(), self.map_range_2.get()],
                 self.map_color.get(),
-                [self.cmap_range_1.get(), self.cmap_range_2.get()],
+                cmap_range,
                 self.alpha.get()
             )
             self.update_selection()
@@ -303,7 +315,7 @@ class MainWindow(tk.Frame):
         if not (0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]):
             return
 
-        if self.autoscale.get():
+        if self.spec_autoscale.get():
             plt.autoscale(True)
             self.ax[1].cla()
         else:
