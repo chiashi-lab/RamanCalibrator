@@ -1,3 +1,4 @@
+import io
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -32,6 +33,24 @@ class RenishawCalibrator(Calibrator):
         self.reader_raw = WDFReader(filename)
         self.xdata = self.reader_raw.xdata.copy()
         self.map_data = self.reader_raw.spectra.copy()
+        if len(self.map_data.shape) == 1:  # 点測定データ
+            self.map_data = self.map_data.reshape(1, 1, -1)
+            # 仮のデータを入れる
+            self.shape = self.map_data.shape[:2]
+            # マッピングの一番右下の座標
+            self.x_start = 0
+            self.y_start = 0
+            # マッピングの1ピクセルあたりのサイズ
+            self.x_pad = 1
+            self.y_pad = 1
+            # マッピングの全体のサイズ
+            self.x_span = 1
+            self.y_span = 1
+            # 空の画像を作る
+            self.img = Image.new('RGB', (1, 1), (127, 127, 127))
+            self.reader_raw.img_origins = (0, 0)
+            self.reader_raw.img_dimensions = (1, 1)
+            return True
         # 二次元じゃない場合False (x座標) x (y座標) x (スペクトル) の3次元のはず
         if len(self.map_data.shape) != 3:
             return False
@@ -45,6 +64,7 @@ class RenishawCalibrator(Calibrator):
         # マッピングの全体のサイズ
         self.x_span = self.reader_raw.map_info['x_span']
         self.y_span = self.reader_raw.map_info['y_span']
+        self.img = Image.open(self.reader_raw.img)
         return True
 
     def load_ref(self, filename: str) -> bool:
@@ -79,12 +99,11 @@ class RenishawCalibrator(Calibrator):
         # 光学像の位置、サイズを取り出す
         img_x0, img_y0 = self.reader_raw.img_origins
         img_w, img_h = self.reader_raw.img_dimensions
-        img = Image.open(self.reader_raw.img)
         extent_optical = (img_x0, img_x0 + img_w, img_y0 + img_h, img_y0)
         ax.set_xlim(img_x0, img_x0 + img_w)
         ax.set_ylim(img_y0 + img_h, img_y0)
         # まずは光学像を描画
-        ax.imshow(img, extent=extent_optical)
+        ax.imshow(self.img, extent=extent_optical)
 
         extent_mapping = (self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
         map_range_idx = (map_range[0] < self.xdata) & (self.xdata < map_range[1])
@@ -126,7 +145,9 @@ class RenishawCalibrator(Calibrator):
 
     def is_inside(self, x: float, y: float) -> bool:
         # check if the selected position is inside the mapping
-        if (self.x_start <= x <= self.x_start + self.x_span) and (self.y_start + self.y_span <= y <= self.y_start):
+        xmin, xmax = sorted([self.x_start, self.x_start + self.x_span])
+        ymin, ymax = sorted([self.y_start, self.y_start + self.y_span])
+        if (xmin <= x <= xmax) and (ymin <= y <= ymax):
             return True
         else:
             return False
