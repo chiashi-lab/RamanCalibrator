@@ -60,8 +60,8 @@ class MainWindow(tk.Frame):
     def create_widgets(self) -> None:
         style = ttk.Style()
         style.theme_use('winnative')
-        style.configure('TButton', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='black')
-        style.configure('R.TButton', font=font_md, width=14, padding=[0, 4, 0, 4], foreground='red')
+        style.configure('TButton', font=font_md, width=12, padding=[0, 4, 0, 4], foreground='black')
+        style.configure('R.TButton', font=font_md, width=12, padding=[0, 4, 0, 4], foreground='red')
         style.configure('TLabel', font=font_sm, foreground='black')
         style.configure('TEntry', padding=[0, 4, 0, 4], foreground='black')
         style.configure('TCheckbutton', font=font_md, foreground='black')
@@ -70,28 +70,30 @@ class MainWindow(tk.Frame):
         style.configure('Treeview.Heading', font=font_md, foreground='black')
         # canvas
         self.width_canvas = 1200
-        self.height_canvas = 600
+        self.height_canvas = 800
         dpi = 50
         if os.name == 'posix':
             self.width_canvas /= 2
             self.height_canvas /= 2
         fig, self.ax = plt.subplots(1, 2, figsize=(self.width_canvas / dpi, self.height_canvas / dpi), dpi=dpi)
         self.canvas = FigureCanvasTkAgg(fig, self.master)
-        self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=3)
+        self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=10)
         toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
         toolbar.update()
-        toolbar.grid(row=3, column=0)
+        toolbar.grid(row=10, column=0)
         fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.canvas.mpl_connect('key_press_event', self.key_pressed)
         self.canvas.mpl_connect('key_press_event', key_press_handler)
 
         # frames
-        frame_data = ttk.LabelFrame(self.master, text='Data')
+        frame_data = ttk.LabelFrame(self.master, text='Data', width=500)
         frame_download = ttk.LabelFrame(self.master, text='Download')
+        frame_map = ttk.LabelFrame(self.master, text='Map')
         frame_plot = ttk.LabelFrame(self.master, text='Plot')
         frame_data.grid(row=0, column=1)
         frame_download.grid(row=1, column=1)
-        frame_plot.grid(row=2, column=1)
+        frame_map.grid(row=2, column=1)
+        frame_plot.grid(row=3, column=1)
 
         # frame_data
         label_raw = ttk.Label(frame_data, text='Raw:')
@@ -150,26 +152,26 @@ class MainWindow(tk.Frame):
         self.button_save.grid(row=1, column=2, rowspan=2, sticky=tk.NS)
         checkbox_show_selection_in_map.grid(row=3, column=0, columnspan=3)
 
-        # frame plot
-        label_map_range = ttk.Label(frame_plot, text='Map Range')
+        # frame_map
+        label_map_range = ttk.Label(frame_map, text='Map Range')
         self.map_range = tk.StringVar(value='G(1570~1610)')
-        self.optionmenu_map_range = ttk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
+        self.optionmenu_map_range = ttk.OptionMenu(frame_map, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
                                                   command=self.change_map_range)
         self.optionmenu_map_range.config(state=tk.DISABLED)
         self.optionmenu_map_range['menu'].config(font=font_md)
         self.map_range_1 = tk.DoubleVar(value=1570)
         self.map_range_2 = tk.DoubleVar(value=1610)
-        entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md, width=6)
-        entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md, width=6)
-        label_cmap_range = ttk.Label(frame_plot, text='Color Range')
+        entry_map_range_1 = ttk.Entry(frame_map, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md, width=6)
+        entry_map_range_2 = ttk.Entry(frame_map, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md, width=6)
+        label_cmap_range = ttk.Label(frame_map, text='Color Range')
         self.cmap_range_1 = tk.DoubleVar(value=0)
         self.cmap_range_2 = tk.DoubleVar(value=10000)
-        self.entry_cmap_range_1 = tk.Entry(frame_plot, textvariable=self.cmap_range_1, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
-        self.entry_cmap_range_2 = tk.Entry(frame_plot, textvariable=self.cmap_range_2, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
-        self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED)
+        self.entry_cmap_range_1 = tk.Entry(frame_map, textvariable=self.cmap_range_1, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
+        self.entry_cmap_range_2 = tk.Entry(frame_map, textvariable=self.cmap_range_2, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
+        self.button_apply = ttk.Button(frame_map, text='APPLY', command=self.imshow, state=tk.DISABLED)
         self.map_color = tk.StringVar(value='hot')
-        label_map_color = ttk.Label(frame_plot, text='Color Map')
-        self.optionmenu_map_color = ttk.OptionMenu(frame_plot, self.map_color, self.map_color.get(),
+        label_map_color = ttk.Label(frame_map, text='Color Map')
+        self.optionmenu_map_color = ttk.OptionMenu(frame_map, self.map_color, self.map_color.get(),
                                            *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
                                                     'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
                                                     'gray', 'pink', 'spring', 'summer', 'autumn', 'winter',
@@ -179,14 +181,13 @@ class MainWindow(tk.Frame):
                                                    command=self.imshow)
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.optionmenu_map_color['menu'].config(font=font_md)
-        label_alpha = ttk.Label(frame_plot, text='Alpha')
+        label_alpha = ttk.Label(frame_map, text='Alpha')
         self.alpha = tk.DoubleVar(value=1)
-        entry_alpha = tk.Entry(frame_plot, textvariable=self.alpha, justify=tk.CENTER, font=font_md, width=6)
-        self.spec_autoscale = tk.BooleanVar(value=True)
-        checkbox_spec_autoscale = ttk.Checkbutton(frame_plot, text='Spectrum Auto Scale', variable=self.spec_autoscale)
+        entry_alpha = tk.Entry(frame_map, textvariable=self.alpha, justify=tk.CENTER, font=font_md, width=6)
         self.map_autoscale = tk.BooleanVar(value=True)
-        checkbox_map_autoscale = ttk.Checkbutton(frame_plot, text='Color Map Auto Scale', variable=self.map_autoscale, command=self.on_map_autoscale)
-        self.button_show_ref = ttk.Button(frame_plot, text='SHOW REFERENCE', command=self.show_ref, takefocus=False, state=tk.DISABLED)
+        checkbox_map_autoscale = ttk.Checkbutton(frame_map, text='Color Map Auto Scale', command=self.on_map_autoscale, variable=self.map_autoscale, takefocus=False)
+        self.show_crosshair = tk.BooleanVar(value=True)
+        checkbox_show_crosshair = ttk.Checkbutton(frame_map, text='Show Crosshair', command=self.update_plot, variable=self.show_crosshair, takefocus=False)
 
         label_map_range.grid(row=0, column=0, rowspan=2)
         self.optionmenu_map_range.grid(row=0, column=1, columnspan=2, sticky=tk.EW)
@@ -201,8 +202,15 @@ class MainWindow(tk.Frame):
         label_alpha.grid(row=4, column=0)
         entry_alpha.grid(row=4, column=1)
         checkbox_map_autoscale.grid(row=5, column=0, columnspan=4)
-        checkbox_spec_autoscale.grid(row=6, column=0, columnspan=4)
-        self.button_show_ref.grid(row=7, column=0, columnspan=4, sticky=tk.EW)
+        checkbox_show_crosshair.grid(row=6, column=0, columnspan=4)
+
+        # frame_plot
+        self.spec_autoscale = tk.BooleanVar(value=True)
+        checkbox_spec_autoscale = ttk.Checkbutton(frame_plot, text='Spectrum Auto Scale', variable=self.spec_autoscale, takefocus=False)
+        self.button_show_ref = ttk.Button(frame_plot, text='SHOW REFERENCE', command=self.show_ref, takefocus=False, state=tk.DISABLED)
+
+        checkbox_spec_autoscale.grid(row=0, column=0)
+        self.button_show_ref.grid(row=1, column=0, sticky=tk.EW)
 
         # canvas_drop
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
@@ -258,7 +266,7 @@ class MainWindow(tk.Frame):
         self.row, self.col = self.calibrator.col2row(iy, ix)
         self.update_plot()
 
-    def change_map_range(self, event=None) -> None:
+    def change_map_range(self, *args) -> None:
         if self.map_range.get() == 'G(1570~1610)':
             self.map_range_1.set(1570)
             self.map_range_2.set(1610)
@@ -267,7 +275,7 @@ class MainWindow(tk.Frame):
             self.map_range_2.set(2750)
         self.imshow()
 
-    def on_map_autoscale(self, event=None) -> None:
+    def on_map_autoscale(self, *args) -> None:
         if self.map_autoscale.get():
             self.entry_cmap_range_1.config(state=tk.DISABLED)
             self.entry_cmap_range_2.config(state=tk.DISABLED)
@@ -275,10 +283,9 @@ class MainWindow(tk.Frame):
             self.entry_cmap_range_1.config(state=tk.NORMAL)
             self.entry_cmap_range_2.config(state=tk.NORMAL)
 
-    def imshow(self, event=None) -> None:
+    def imshow(self, *args) -> None:
         self.ax[0].cla()
-        self.horizontal_line = self.ax[0].axhline(color='k', lw=1, ls='--')
-        self.vertical_line = self.ax[0].axvline(color='k', lw=1, ls='--')
+        self.create_crosshair()
         try:
             cmap_range = [self.cmap_range_1.get(), self.cmap_range_2.get()] if not self.map_autoscale.get() else None
             self.calibrator.imshow(
@@ -292,27 +299,46 @@ class MainWindow(tk.Frame):
         except ValueError as e:
             print('ValueError', e)
 
-    def show_ref(self, event=None):
+    def show_ref(self, *args) -> None:
         if self.filename_ref.get() == 'please drag & drop!':
             return
         plt.autoscale(True)
+        print(self.line)
         if self.line is not None:
             self.line[0].remove()
         else:
             self.ax[1].cla()
 
-        self.line = self.ax[1].plot(
-            self.calibrator.xdata,
-            self.calibrator.ydata,
-            label=self.material.get(), color='k')
-        self.ax[1].legend()
+        try:  # キャリブレーション済みの場合はキャリブレーション結果を表示
+            self.calibrator.show_fit_result(self.ax[1])
+            self.line = None
+        except ValueError:  # 未キャリブレーションの場合は生データを表示
+            self.line = self.ax[1].plot(
+                self.calibrator.xdata,
+                self.calibrator.ydata,
+                label=self.material.get(), color='k')
+            self.ax[1].legend()
         self.canvas.draw()
 
-    def update_plot(self) -> None:
+    def create_crosshair(self) -> None:
+        self.horizontal_line = self.ax[0].axhline(color='k', lw=2, ls=(0, (5, 5)), gapcolor='w')
+        self.vertical_line = self.ax[0].axvline(color='k', lw=2, ls=(0, (5, 5)), gapcolor='w')
+
+    def update_crosshair(self) -> None:
         # マッピング上のクロスヘアを移動
         x, y = self.calibrator.idx2coord(self.row, self.col)
         self.horizontal_line.set_ydata(y)
         self.vertical_line.set_xdata(x)
+
+        if self.show_crosshair.get():
+            self.horizontal_line.set_visible(True)
+            self.vertical_line.set_visible(True)
+        else:
+            self.horizontal_line.set_visible(False)
+            self.vertical_line.set_visible(False)
+
+    def update_plot(self) -> None:
+        self.update_crosshair()
 
         if not (0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]):
             return
@@ -356,7 +382,7 @@ class MainWindow(tk.Frame):
                 r.set_visible(True)
         self.canvas.draw()
 
-    def select_from_treeview(self, event=None):
+    def select_from_treeview(self, *args):
         if self.treeview.focus() == '':
             return
         self.row, self.col = self.calibrator.col2row(*self.treeview.item(self.treeview.focus())['values'][::-1])

@@ -1,4 +1,3 @@
-import io
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -24,9 +23,7 @@ class RenishawCalibrator(Calibrator):
         self.set_measurement('Raman')
 
     def reset(self):
-        self.reader_raw = None
-        self.reader_ref = None
-        self.map_data = None
+        self.__init__()
 
     def load_raw(self, filename: str) -> bool:
         # 二次元マッピングファイルを読み込む
