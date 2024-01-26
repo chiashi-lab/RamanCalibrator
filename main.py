@@ -151,7 +151,7 @@ class MainWindow(tk.Frame):
         checkbox_show_selection_in_map.grid(row=3, column=0, columnspan=3)
 
         # frame plot
-        label_map_range = tk.Label(frame_plot, text='Map Range')
+        label_map_range = ttk.Label(frame_plot, text='Map Range')
         self.map_range = tk.StringVar(value='G(1570~1610)')
         self.optionmenu_map_range = ttk.OptionMenu(frame_plot, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
                                                   command=self.change_map_range)
@@ -161,14 +161,14 @@ class MainWindow(tk.Frame):
         self.map_range_2 = tk.DoubleVar(value=1610)
         entry_map_range_1 = ttk.Entry(frame_plot, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md, width=6)
         entry_map_range_2 = ttk.Entry(frame_plot, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md, width=6)
-        label_cmap_range = tk.Label(frame_plot, text='Color Range')
+        label_cmap_range = ttk.Label(frame_plot, text='Color Range')
         self.cmap_range_1 = tk.DoubleVar(value=0)
         self.cmap_range_2 = tk.DoubleVar(value=10000)
         self.entry_cmap_range_1 = tk.Entry(frame_plot, textvariable=self.cmap_range_1, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
         self.entry_cmap_range_2 = tk.Entry(frame_plot, textvariable=self.cmap_range_2, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
         self.button_apply = ttk.Button(frame_plot, text='APPLY', command=self.imshow, state=tk.DISABLED)
         self.map_color = tk.StringVar(value='hot')
-        label_map_color = tk.Label(frame_plot, text='Color Map')
+        label_map_color = ttk.Label(frame_plot, text='Color Map')
         self.optionmenu_map_color = ttk.OptionMenu(frame_plot, self.map_color, self.map_color.get(),
                                            *sorted(['viridis', 'plasma', 'inferno', 'magma', 'cividis',
                                                     'Wistia', 'hot', 'binary', 'bone', 'cool', 'copper',
@@ -179,7 +179,7 @@ class MainWindow(tk.Frame):
                                                    command=self.imshow)
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.optionmenu_map_color['menu'].config(font=font_md)
-        label_alpha = tk.Label(frame_plot, text='Alpha')
+        label_alpha = ttk.Label(frame_plot, text='Alpha')
         self.alpha = tk.DoubleVar(value=1)
         entry_alpha = tk.Entry(frame_plot, textvariable=self.alpha, justify=tk.CENTER, font=font_md, width=6)
         self.spec_autoscale = tk.BooleanVar(value=True)
