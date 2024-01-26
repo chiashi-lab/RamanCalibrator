@@ -186,6 +186,7 @@ class MainWindow(tk.Frame):
         checkbox_spec_autoscale = ttk.Checkbutton(frame_plot, text='Spectrum Auto Scale', variable=self.spec_autoscale)
         self.map_autoscale = tk.BooleanVar(value=True)
         checkbox_map_autoscale = ttk.Checkbutton(frame_plot, text='Color Map Auto Scale', variable=self.map_autoscale, command=self.on_map_autoscale)
+        self.button_show_ref = ttk.Button(frame_plot, text='SHOW REFERENCE', command=self.show_ref, takefocus=False, state=tk.DISABLED)
 
         label_map_range.grid(row=0, column=0, rowspan=2)
         self.optionmenu_map_range.grid(row=0, column=1, columnspan=2, sticky=tk.EW)
@@ -201,6 +202,7 @@ class MainWindow(tk.Frame):
         entry_alpha.grid(row=4, column=1)
         checkbox_map_autoscale.grid(row=5, column=0, columnspan=4)
         checkbox_spec_autoscale.grid(row=6, column=0, columnspan=4)
+        self.button_show_ref.grid(row=7, column=0, columnspan=4, sticky=tk.EW)
 
         # canvas_drop
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
@@ -397,6 +399,7 @@ class MainWindow(tk.Frame):
                 if material in filename:
                     self.material.set(material)
             self.button_calibrate.config(state=tk.ACTIVE)
+            self.button_show_ref.config(state=tk.ACTIVE)
             self.show_ref()
             self.tooltip_ref.set(filename)
         else:  # raw data
@@ -429,6 +432,7 @@ class MainWindow(tk.Frame):
         self.folder_raw = './'
         self.folder_ref = './'
         self.button_calibrate.config(state=tk.DISABLED)
+        self.button_show_ref.config(state=tk.DISABLED)
         self.button_apply.config(state=tk.DISABLED)
         self.optionmenu_map_range.config(state=tk.DISABLED)
         self.optionmenu_map_color.config(state=tk.DISABLED)

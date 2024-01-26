@@ -47,9 +47,9 @@ class RenishawCalibrator(Calibrator):
             self.x_span = 1
             self.y_span = 1
             # 空の画像を作る
-            self.img = Image.new('RGB', (1, 1), (127, 127, 127))
-            self.reader_raw.img_origins = (0, 0)
-            self.reader_raw.img_dimensions = (1, 1)
+            self.img = Image.new('RGB', (1, 1), (200, 200, 200))
+            self.reader_raw.img_origins = (-0.1, -0.1)
+            self.reader_raw.img_dimensions = (1.2, 1.2)
             return True
         # 二次元じゃない場合False (x座標) x (y座標) x (スペクトル) の3次元のはず
         if len(self.map_data.shape) != 3:
