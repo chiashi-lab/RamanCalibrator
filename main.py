@@ -244,6 +244,7 @@ class MainWindow(tk.Frame):
         if not self.calibrator.is_inside(event.xdata, event.ydata):
             return
         self.row, self.col = self.calibrator.coord2idx(event.xdata, event.ydata)
+        self.update_crosshair()
         self.update_plot()
 
     def key_pressed(self, event: matplotlib.backend_bases.KeyEvent) -> None:
@@ -264,6 +265,7 @@ class MainWindow(tk.Frame):
         else:
             return
         self.row, self.col = self.calibrator.col2row(iy, ix)
+        self.update_crosshair()
         self.update_plot()
 
     def change_map_range(self, *args) -> None:
@@ -338,8 +340,6 @@ class MainWindow(tk.Frame):
             self.vertical_line.set_visible(False)
 
     def update_plot(self) -> None:
-        self.update_crosshair()
-
         if not (0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]):
             return
 
@@ -386,6 +386,7 @@ class MainWindow(tk.Frame):
         if self.treeview.focus() == '':
             return
         self.row, self.col = self.calibrator.col2row(*self.treeview.item(self.treeview.focus())['values'][::-1])
+        self.update_crosshair()
         self.update_plot()
 
     def drop(self, event: TkinterDnD.DnDEvent) -> None:
