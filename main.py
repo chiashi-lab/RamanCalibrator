@@ -305,7 +305,6 @@ class MainWindow(tk.Frame):
         if self.filename_ref.get() == 'please drag & drop!':
             return
         plt.autoscale(True)
-        print(self.line)
         if self.line is not None:
             self.line[0].remove()
         else:
@@ -325,6 +324,7 @@ class MainWindow(tk.Frame):
     def create_crosshair(self) -> None:
         self.horizontal_line = self.ax[0].axhline(color='k', lw=2, ls=(0, (5, 5)), gapcolor='w')
         self.vertical_line = self.ax[0].axvline(color='k', lw=2, ls=(0, (5, 5)), gapcolor='w')
+        self.update_crosshair()
 
     def update_crosshair(self) -> None:
         # マッピング上のクロスヘアを移動
@@ -538,7 +538,7 @@ class MainWindow(tk.Frame):
                 abs_path_ref = ''
             else:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
-            filename = os.path.join(folder_to_save, f'{str(ix)}_{str(iy)}.txt')
+            filename = os.path.join(folder_to_save, f'{self.filename_raw.get()}_{str(ix)}_{str(iy)}.txt')
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
