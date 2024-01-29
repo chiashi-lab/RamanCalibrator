@@ -187,7 +187,7 @@ class MainWindow(tk.Frame):
         self.map_autoscale = tk.BooleanVar(value=True)
         checkbox_map_autoscale = ttk.Checkbutton(frame_map, text='Color Map Auto Scale', command=self.on_map_autoscale, variable=self.map_autoscale, takefocus=False)
         self.show_crosshair = tk.BooleanVar(value=True)
-        checkbox_show_crosshair = ttk.Checkbutton(frame_map, text='Show Crosshair', command=self.update_plot, variable=self.show_crosshair, takefocus=False)
+        checkbox_show_crosshair = ttk.Checkbutton(frame_map, text='Show Crosshair', command=self.update_crosshair, variable=self.show_crosshair, takefocus=False)
 
         label_map_range.grid(row=0, column=0, rowspan=2)
         self.optionmenu_map_range.grid(row=0, column=1, columnspan=2, sticky=tk.EW)
@@ -338,6 +338,7 @@ class MainWindow(tk.Frame):
         else:
             self.horizontal_line.set_visible(False)
             self.vertical_line.set_visible(False)
+        self.canvas.draw()
 
     def update_plot(self) -> None:
         if not (0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]):
