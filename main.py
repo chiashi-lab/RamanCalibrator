@@ -518,6 +518,14 @@ class MainWindow(tk.Frame):
         self.treeview.delete(*self.treeview.get_children())
         self.update_selection()
 
+    def construct_filename(self, ix: int, iy: int) -> str:
+        filename, ext = os.path.splitext(self.filename_raw.get())
+        ny, nx = self.calibrator.map_data.shape[:2]
+        # 0埋め
+        ix = str(ix).zfill(len(str(nx)))
+        iy = str(iy).zfill(len(str(ny)))
+        return f'{filename}_{ix}_{iy}.txt'
+
     def save(self) -> None:
         # 保存リスト内のファイルを保存
         if not self.treeview.get_children():
@@ -539,7 +547,7 @@ class MainWindow(tk.Frame):
                 abs_path_ref = ''
             else:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
-            filename = os.path.join(folder_to_save, f'{os.path.splitext(self.filename_raw.get())[0]}_{str(ix)}_{str(iy)}.txt')
+            filename = os.path.join(folder_to_save, self.construct_filename(ix, iy))
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
