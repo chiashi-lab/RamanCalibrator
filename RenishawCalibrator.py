@@ -39,6 +39,7 @@ class RenishawCalibrator(Calibrator):
     def reset(self):
         if self.ax is not None:
             self.ax.cla()
+            self.ax.set_title('Reference Spectrum', fontsize=30)
         self.__init__(keep_ax=True)
 
     def reset_ref(self):
@@ -46,6 +47,7 @@ class RenishawCalibrator(Calibrator):
             self.reader_raw.close()
         self.reader_ref = None
         self.is_ref_loaded = False
+        self.is_calibrated = False
 
     def set_ax(self, ax):
         self.ax = ax

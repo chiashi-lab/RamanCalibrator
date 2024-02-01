@@ -2,6 +2,7 @@ import os
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 from tkinterdnd2 import TkinterDnD, DND_FILES
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.backend_bases
 from matplotlib import rcParams, patches
@@ -86,6 +87,17 @@ class MainWindow(tk.Frame):
 
         self.mode = 'Renishaw'  # or 'Raman488'
 
+        # ピーク矩形選択のため
+        self.master.bind('<Control-Key-z>', self.undo)
+        self.x0, self.y0, self.x1, self.y1 = 0, 0, 0, 0
+        self.rectangles = []
+        self.texts = []
+        self.ranges = []
+        self.drawing = False
+        self.rect_drawing = None
+        self.new_window = None
+        self.widgets_assign = {}
+
         self.create_widgets()
         self.map_manager.set_ax(self.ax_map)
 
@@ -116,10 +128,13 @@ class MainWindow(tk.Frame):
         self.ax_ref.set_title('Reference Spectrum', fontsize=30)
         self.canvas = FigureCanvasTkAgg(fig, self.master)
         self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=10)
-        toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
-        toolbar.update()
-        toolbar.grid(row=10, column=0)
-        fig.canvas.mpl_connect('button_press_event', self.on_click)
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
+        self.toolbar.update()
+        self.toolbar.grid(row=10, column=0)
+        # ピークの矩形選択のため
+        fig.canvas.mpl_connect('button_press_event', self.on_press)
+        fig.canvas.mpl_connect('motion_notify_event', self.draw_preview)
+        fig.canvas.mpl_connect('button_release_event', self.on_release)
         self.canvas.mpl_connect('key_press_event', self.key_pressed)
         self.canvas.mpl_connect('key_press_event', key_press_handler)
 
@@ -162,17 +177,19 @@ class MainWindow(tk.Frame):
         self.material = tk.StringVar(value=c.get_material_list()[0])
         self.dimension = tk.StringVar(value=c.get_dimension_list()[0])
         self.function = tk.StringVar(value=c.get_function_list()[0])
-        optionmenu_material = ttk.OptionMenu(frame_calibration, self.material, self.material.get(), *c.get_material_list(), command=self.show_ref)
+        optionmenu_material = ttk.OptionMenu(frame_calibration, self.material, self.material.get(), *c.get_material_list(), command=self.refresh_assign_window)
         optionmenu_dimension = ttk.OptionMenu(frame_calibration, self.dimension, self.dimension.get(), *c.get_dimension_list())
         optionmenu_function = ttk.OptionMenu(frame_calibration, self.function, self.function.get(), *c.get_function_list())
         optionmenu_material['menu'].config(font=font_md)
         optionmenu_dimension['menu'].config(font=font_md)
         optionmenu_function['menu'].config(font=font_md)
+        self.button_assign_manually = ttk.Button(frame_calibration, text='ASSIGN', command=self.open_assign_window)
+        self.frame_assign = None
         self.button_calibrate = ttk.Button(frame_calibration, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
         optionmenu_material.grid(row=0, column=0)
         optionmenu_dimension.grid(row=0, column=1)
         optionmenu_function.grid(row=0, column=2)
-        self.button_calibrate.grid(row=1, column=0, columnspan=3)
+        self.button_calibrate.grid(row=1, column=1, columnspan=2)
 
         # frame_download
         self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
@@ -280,6 +297,69 @@ class MainWindow(tk.Frame):
         self.canvas_drop_Raman488.create_text(self.width_canvas / 2, self.height_canvas * 5 / 6, text='③ Background file',
                                               font=('Arial', 30))
 
+    def open_assign_window(self):
+        if self.new_window is not None and self.new_window.winfo_exists():
+            self.new_window.lift()
+            return
+        self.new_window = tk.Toplevel(self.master)
+        self.new_window.title('Assign Peaks')
+
+        self.new_window.protocol('WM_DELETE_WINDOW', self.close_assign_window)
+
+        self.frame_assign = ttk.Frame(self.new_window)
+        self.frame_assign.pack(fill=tk.BOTH, expand=True)
+
+        label_description = ttk.Label(self.frame_assign, text='適用したい場合はウィンドウを開いたままにしてください．')
+        label_index = ttk.Label(self.frame_assign, text='Index')
+        label_x = ttk.Label(self.frame_assign, text='x')
+        label_description.grid(row=0, column=0, columnspan=2)
+        label_index.grid(row=1, column=0)
+        label_x.grid(row=1, column=1)
+
+        self.refresh_assign_window()
+
+    def close_assign_window(self):
+        if self.new_window is not None and self.new_window.winfo_exists():
+            self.new_window.destroy()
+        self.new_window = None
+
+    def refresh_assign_window(self, *args):
+        # clear
+        for w in self.widgets_assign.values():
+            for ww in w:
+                ww.destroy()
+        self.widgets_assign = {}
+        # create
+        self.calibrator.set_material(self.material.get())
+        x_true = self.calibrator.get_true_x()
+        auto_x_true = self.assign_peaks_automatically()
+        for i, (r, auto) in enumerate(zip(self.ranges, auto_x_true)):
+            label_index = ttk.Label(self.frame_assign, text=str(self.ranges.index(r)))
+            combobox_x = ttk.Combobox(self.frame_assign, values=list(x_true), justify=tk.CENTER)
+            combobox_x.set(auto)
+            label_index.grid(row=i + 2, column=0)
+            combobox_x.grid(row=i + 2, column=1)
+            self.widgets_assign[i] = (label_index, combobox_x)
+
+    def assign_peaks_automatically(self):
+        x_true = self.calibrator.get_true_x()
+        found_x_true = []
+        for x0, y0, x1, y1 in self.ranges:
+            x_mid = (x0 + x1) / 2
+            diff = np.abs(x_true - x_mid)
+            idx = np.argmin(diff)
+            found_x_true.append(x_true[idx])
+        return found_x_true
+
+    def assign_peaks(self):
+        if self.new_window is None or not self.new_window.winfo_exists():
+            return self.assign_peaks_automatically()
+        found_x_true = []
+        for widgets in self.widgets_assign.values():
+            x = widgets[1].get()
+            found_x_true.append(float(x))
+        return found_x_true
+
     # 入力のバリデーションの関数，煩雑なのでどうにかしたさある
     def validate_map_range_1(self, after):
         if not self.map_manager.is_loaded:
@@ -356,24 +436,40 @@ class MainWindow(tk.Frame):
         self.calibrator.set_material(self.material.get())
         self.calibrator.set_function(self.function.get())
         self.calibrator.reset_data()
-        ok = self.calibrator.calibrate()
+        if self.new_window is not None and self.new_window.winfo_exists():  # 矩形選択のウィンドウが開かれているとき
+            if len(self.ranges) != len(self.widgets_assign):
+                messagebox.showerror('Error', 'Peaks not assigned.')
+                return
+            ok = self.calibrator.calibrate(mode='manual', ranges=self.ranges, x_true=self.assign_peaks())
+        else:
+            ok = self.calibrator.calibrate()
         if not ok:
-            messagebox.showerror('Error', 'Peaks not found.')
+            messagebox.showerror('Error', 'Calibration failed.')
             return
-        self.calibrator.plot()
+        self.button_calibrate.config(state=tk.DISABLED)
+        self.show_ref()
         self.map_manager.update_xdata(self.calibrator.xdata)
         self.update_plot()
         self.canvas.draw()
 
     @check_map_loaded
-    def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
+    def on_press(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # クリックした点のスペクトルを表示する
         if event.xdata is None or event.ydata is None:
             return
-        if event.inaxes != self.ax_map:
-            return
-        self.map_manager.on_click(event.xdata, event.ydata)
-        self.update_plot()
+        if event.inaxes == self.ax_map:
+            self.map_manager.on_click(event.xdata, event.ydata)
+            self.update_plot()
+        elif event.inaxes == self.ax_ref:  # ピークの矩形選択のため
+            if self.new_window is None or not self.new_window.winfo_exists():
+                return
+            # Toolbarのズーム機能を使っている状態では動作しないようにする
+            if self.toolbar._buttons['Zoom'].var.get():
+                return
+            self.x0 = event.xdata
+            self.y0 = event.ydata
+
+            self.drawing = True
 
     @check_map_loaded
     def key_pressed(self, event: matplotlib.backend_bases.KeyEvent) -> None:
@@ -415,6 +511,13 @@ class MainWindow(tk.Frame):
     def show_ref(self, *args) -> None:
         self.calibrator.set_material(self.material.get())
         self.calibrator.plot()
+        # 矩形選択したピークを描画
+        self.texts = []
+        for ran, rec in zip(self.ranges, self.rectangles):
+            print(self.ranges)
+            self.ax_ref.add_patch(rec)
+            t = self.ax_ref.text(ran[2], ran[3], str(self.ranges.index(ran)), color='r', fontsize=20)
+            self.texts.append(t)
         self.canvas.draw()
 
     @check_map_loaded
@@ -516,11 +619,11 @@ class MainWindow(tk.Frame):
         if filename.split('.')[-1] == 'wdf':
             self.calibrator = RenishawCalibrator()
             self.mode = 'Renishaw'
-            self.forget_bg_widgets()
+            self.forget_Raman488_widgets()
         elif filename.split('.')[-1] == 'hdf5':
             self.mode = 'Raman488'
             self.calibrator = Raman488Calibrator()
-            self.remember_bg_widgets()
+            self.remember_Raman488_widgets()
         else:
             messagebox.showerror('Error', 'Only .wdf or .hdf5 files are acceptable.')
             return
@@ -571,6 +674,16 @@ class MainWindow(tk.Frame):
             if material in filename:
                 self.material.set(material)
         self.button_calibrate.config(state=tk.ACTIVE)
+
+        # ピークの矩形選択のため
+        for i in range(len(self.rectangles)):
+            self.rectangles[i].remove()
+            self.texts[i].remove()
+        self.rectangles = []
+        self.texts = []
+        self.ranges = []
+        self.refresh_assign_window()
+
         self.show_ref()
         self.tooltip_ref.set(filename)
 
@@ -592,21 +705,96 @@ class MainWindow(tk.Frame):
         self.canvas_drop_Renishaw.place_forget()
         self.canvas_drop_Raman488.place_forget()
 
-    def forget_bg_widgets(self) -> None:
+    def forget_Raman488_widgets(self) -> None:
         self.checkbox_subtract_bg.grid_forget()
         self.label_bg.grid_forget()
         self.label_filename_bg.grid_forget()
         self.checkbox_remove_cosmic_ray.grid_forget()
+        self.button_assign_manually.grid_forget()
 
-    def remember_bg_widgets(self) -> None:
+    def remember_Raman488_widgets(self) -> None:
         self.label_bg.grid(row=2, column=0)
         self.label_filename_bg.grid(row=2, column=1)
         self.checkbox_subtract_bg.grid(row=3, column=0, columnspan=2)
         self.checkbox_remove_cosmic_ray.grid(row=4, column=0, columnspan=2)
+        self.button_assign_manually.grid(row=1, column=0)
+
+    def on_release(self, event):
+        if event.xdata is None or event.ydata is None:
+            return
+        if self.new_window is None or not self.new_window.winfo_exists():
+            return
+        if event.inaxes != self.ax_ref:
+            return
+        # Toolbarのズーム機能を使っている状態では動作しないようにする
+        if self.toolbar._buttons['Zoom'].var.get():
+            return
+
+        # プレビュー用の矩形を消す
+        if self.rect_drawing is not None:
+            self.rect_drawing.remove()
+            self.rect_drawing = None
+
+        self.drawing = False
+
+        self.x1 = event.xdata
+        self.y1 = event.ydata
+        if self.x0 == self.x1 or self.y0 == self.y1:
+            return
+        if self.is_overlapped(self.x0, self.x1):
+            messagebox.showerror('Error', 'Overlapped.')
+            return
+        x0, x1 = sorted([self.x0, self.x1])
+        y0, y1 = sorted([self.y0, self.y1])
+        r = patches.Rectangle((x0, y0), x1 - x0, y1 - y0, linewidth=1, edgecolor='r',
+                              facecolor='none')
+        self.ax_ref.add_patch(r)
+        t = self.ax_ref.text(x1, y1, str(len(self.rectangles)), color='r', fontsize=20)
+        self.rectangles.append(r)
+        self.texts.append(t)
+        self.ranges.append((x0, y0, x1, y1))
+        self.canvas.draw()
+        if self.new_window is not None and self.new_window.winfo_exists():
+            self.refresh_assign_window()
+
+    def draw_preview(self, event):
+        if event.xdata is None or event.ydata is None:
+            return
+        if not self.drawing:
+            return
+        # Toolbarのズーム機能を使っている状態では動作しないようにする
+        if self.toolbar._buttons['Zoom'].var.get():
+            return
+        if self.rect_drawing is not None:
+            self.rect_drawing.remove()
+        x1 = event.xdata
+        y1 = event.ydata
+        self.rect_drawing = patches.Rectangle((self.x0, self.y0), x1 - self.x0, y1 - self.y0, linewidth=0.5,
+                                              edgecolor='r', linestyle='dashed', facecolor='none')
+        self.ax_ref.add_patch(self.rect_drawing)
+        self.canvas.draw()
+
+    def is_overlapped(self, x0, x1):
+        for x0_, y0_, x1_, y1_ in self.ranges:
+            if x0_ <= x0 <= x1_ or x0_ <= x1 <= x1_:
+                return True
+            if x0 <= x0_ <= x1 or x0 <= x1_ <= x1:
+                return True
+        return False
+
+    def undo(self, event):
+        if len(self.rectangles) == 0:
+            return
+        self.rectangles[-1].remove()
+        self.rectangles.pop()
+        self.texts[-1].remove()
+        self.texts.pop()
+        self.ranges.pop()
+        self.canvas.draw()
 
     def process(self) -> None:
         # バックグラウンド，宇宙線除去
-        if self.subtract_bg.get() and self.processor is None:
+        if self.subtract_bg.get() and (self.processor is None or self.processor.bg_data is None):
             messagebox.showerror('Error', 'Choose background data.')
             self.subtract_bg.set(False)
             return
@@ -615,8 +803,18 @@ class MainWindow(tk.Frame):
         self.canvas.draw()
 
     def reset(self) -> None:
+        # ピークの矩形選択のため
+        for i in range(len(self.rectangles)):
+            self.rectangles[i].remove()
+            self.texts[i].remove()
+        self.rectangles = []
+        self.texts = []
+        self.ranges = []
+        self.close_assign_window()
+
         if self.calibrator is not None:
             self.calibrator.close()  # TODO: calibratorクラスがファイルを管理してるのがよくない
+            self.calibrator.reset()
         self.calibrator = None
         if self.processor is not None:
             self.processor.reset()
@@ -629,10 +827,11 @@ class MainWindow(tk.Frame):
         self.folder_raw = './'
         self.folder_ref = './'
         self.folder_bg = './'
-        self.forget_bg_widgets()
+        self.forget_Raman488_widgets()
         self.button_calibrate.config(state=tk.DISABLED)
         self.row = 0
         self.col = 0
+
         self.treeview.delete(*self.treeview.get_children())
 
     @check_map_loaded

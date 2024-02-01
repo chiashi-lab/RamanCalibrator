@@ -81,6 +81,7 @@ class Raman488Calibrator(Calibrator):
             self.reader_raw.close()
         self.reader_ref = None
         self.is_ref_loaded = False
+        self.is_calibrated = False
 
     def set_ax(self, ax):
         self.ax = ax
