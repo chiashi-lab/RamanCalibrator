@@ -514,7 +514,6 @@ class MainWindow(tk.Frame):
         # 矩形選択したピークを描画
         self.texts = []
         for ran, rec in zip(self.ranges, self.rectangles):
-            print(self.ranges)
             self.ax_ref.add_patch(rec)
             t = self.ax_ref.text(ran[2], ran[3], str(self.ranges.index(ran)), color='r', fontsize=20)
             self.texts.append(t)
