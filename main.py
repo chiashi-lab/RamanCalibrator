@@ -336,6 +336,8 @@ class MainWindow(tk.Frame):
         # クリックした点のスペクトルを表示する
         if event.xdata is None or event.ydata is None:
             return
+        if event.inaxes != self.ax_map:
+            return
         self.map_manager.on_click(event.xdata, event.ydata)
         self.update_plot()
 
