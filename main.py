@@ -7,7 +7,9 @@ import matplotlib.backend_bases
 from matplotlib import rcParams, patches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
+from calibrator import Calibrator
 from RenishawCalibrator import RenishawCalibrator
+from Raman488Calibrator import Raman488Calibrator, Raman488DataProcessor
 from MapManager import MapManager
 from MyTooltip import MyTooltip
 
@@ -63,10 +65,11 @@ class MainWindow(tk.Frame):
     def __init__(self, master: tk.Tk) -> None:
         super().__init__(master)
         self.master = master
-        self.master.title('Renishaw Calibrator')
+        self.master.title('Raman Calibrator')
 
-        self.calibrator: RenishawCalibrator = RenishawCalibrator()
+        self.calibrator: Calibrator = None
         self.map_manager: MapManager = MapManager()
+        self.processor: Raman488DataProcessor = None
 
         self.row = self.col = 0
 
@@ -79,10 +82,12 @@ class MainWindow(tk.Frame):
 
         self.folder_raw = './'
         self.folder_ref = './'
+        self.folder_bg = './'
+
+        self.mode = 'Renishaw'  # or 'Raman488'
 
         self.create_widgets()
         self.map_manager.set_ax(self.ax_map)
-        self.calibrator.set_ax(self.ax_ref)
 
     def create_widgets(self) -> None:
         style = ttk.Style()
@@ -96,8 +101,8 @@ class MainWindow(tk.Frame):
         style.configure('Treeview', font=font_md, foreground='black')
         style.configure('Treeview.Heading', font=font_md, foreground='black')
         # canvas
-        self.width_canvas = 1400
-        self.height_canvas = 800
+        self.width_canvas = 1300
+        self.height_canvas = 900
         dpi = 50
         if os.name == 'posix':
             self.width_canvas /= 2
@@ -119,44 +124,55 @@ class MainWindow(tk.Frame):
         self.canvas.mpl_connect('key_press_event', key_press_handler)
 
         # frames
-        frame_data = ttk.LabelFrame(self.master, text='Data', width=500)
+        frame_data = ttk.LabelFrame(self.master, text='Data')
+        frame_calibration = ttk.LabelFrame(self.master, text='Calibration')
         frame_download = ttk.LabelFrame(self.master, text='Download')
         frame_map = ttk.LabelFrame(self.master, text='Map')
         frame_plot = ttk.LabelFrame(self.master, text='Plot')
         frame_data.grid(row=0, column=1)
-        frame_download.grid(row=1, column=1)
-        frame_map.grid(row=2, column=1)
-        frame_plot.grid(row=3, column=1)
+        frame_calibration.grid(row=1, column=1)
+        frame_download.grid(row=2, column=1)
+        frame_map.grid(row=3, column=1)
+        frame_plot.grid(row=4, column=1)
 
         # frame_data
         label_raw = ttk.Label(frame_data, text='Raw:')
         label_ref = ttk.Label(frame_data, text='Reference:')
+        self.label_bg = ttk.Label(frame_data, text='Background:')
         self.filename_raw = tk.StringVar(value='please drag & drop!')
         self.filename_ref = tk.StringVar(value='please drag & drop!')
+        self.filename_bg = tk.StringVar(value='not loaded')
         label_filename_raw = ttk.Label(frame_data, textvariable=self.filename_raw)
         label_filename_ref = ttk.Label(frame_data, textvariable=self.filename_ref)
+        self.label_filename_bg = ttk.Label(frame_data, textvariable=self.filename_bg)
         self.tooltip_raw = MyTooltip(label_filename_raw, '')
         self.tooltip_ref = MyTooltip(label_filename_ref, '')
-        label_ref.bind('<Button-1>', self.show_ref)
-        label_filename_ref.bind('<Button-1>', self.show_ref)
-        self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
-        self.dimension = tk.StringVar(value=self.calibrator.get_dimension_list()[0])
-        self.function = tk.StringVar(value=self.calibrator.get_function_list()[0])
-        optionmenu_material = ttk.OptionMenu(frame_data, self.material, self.material.get(), *self.calibrator.get_material_list(), command=self.show_ref)
-        optionmenu_dimension = ttk.OptionMenu(frame_data, self.dimension, self.dimension.get(), *self.calibrator.get_dimension_list())
-        optionmenu_function = ttk.OptionMenu(frame_data, self.function, self.function.get(), *self.calibrator.get_function_list())
+        self.tooltip_bg = MyTooltip(self.label_filename_bg, '')
+        self.subtract_bg = tk.BooleanVar(value=False)
+        self.checkbox_subtract_bg = ttk.Checkbutton(frame_data, text='Subtract BG', variable=self.subtract_bg, command=self.process, takefocus=False)
+        self.remove_cosmic_ray = tk.BooleanVar(value=False)
+        self.checkbox_remove_cosmic_ray = ttk.Checkbutton(frame_data, text='Remove Cosmic Ray', variable=self.remove_cosmic_ray, command=self.process, takefocus=False)
+        label_raw.grid(row=0, column=0)
+        label_ref.grid(row=1, column=0)
+        label_filename_raw.grid(row=0, column=1)
+        label_filename_ref.grid(row=1, column=1)
+
+        # frame_calibration
+        c = Calibrator(measurement='Raman')  # リファレンスデータの選択肢を取得するために一時的にCalibratorを作成
+        self.material = tk.StringVar(value=c.get_material_list()[0])
+        self.dimension = tk.StringVar(value=c.get_dimension_list()[0])
+        self.function = tk.StringVar(value=c.get_function_list()[0])
+        optionmenu_material = ttk.OptionMenu(frame_calibration, self.material, self.material.get(), *c.get_material_list(), command=self.show_ref)
+        optionmenu_dimension = ttk.OptionMenu(frame_calibration, self.dimension, self.dimension.get(), *c.get_dimension_list())
+        optionmenu_function = ttk.OptionMenu(frame_calibration, self.function, self.function.get(), *c.get_function_list())
         optionmenu_material['menu'].config(font=font_md)
         optionmenu_dimension['menu'].config(font=font_md)
         optionmenu_function['menu'].config(font=font_md)
-        self.button_calibrate = ttk.Button(frame_data, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
-        label_raw.grid(row=0, column=0)
-        label_filename_raw.grid(row=0, column=1, columnspan=2)
-        label_ref.grid(row=1, column=0)
-        label_filename_ref.grid(row=1, column=1, columnspan=2)
-        optionmenu_material.grid(row=2, column=0)
-        optionmenu_dimension.grid(row=2, column=1)
-        optionmenu_function.grid(row=2, column=2)
-        self.button_calibrate.grid(row=3, column=0, columnspan=3)
+        self.button_calibrate = ttk.Button(frame_calibration, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
+        optionmenu_material.grid(row=0, column=0)
+        optionmenu_dimension.grid(row=0, column=1)
+        optionmenu_function.grid(row=0, column=2)
+        self.button_calibrate.grid(row=1, column=0, columnspan=3)
 
         # frame_download
         self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
@@ -246,13 +262,23 @@ class MainWindow(tk.Frame):
         checkbox_spec_autoscale.grid(row=0, column=0)
 
         # canvas_drop
-        self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
-        self.canvas_drop.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 2, fill='lightgray')
-        self.canvas_drop.create_rectangle(0, self.height_canvas / 2, self.width_canvas, self.height_canvas, fill='gray')
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas / 4, text='① 2D Map .wdf File',
-                                     font=('Arial', 30))
-        self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='② Reference .wdf File',
-                                     font=('Arial', 30))
+        self.canvas_drop_Renishaw = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
+        self.canvas_drop_Renishaw.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 2, fill='lightgray')
+        self.canvas_drop_Renishaw.create_rectangle(0, self.height_canvas / 2, self.width_canvas, self.height_canvas, fill='gray')
+        self.canvas_drop_Renishaw.create_text(self.width_canvas / 2, self.height_canvas / 4, text='① File to calibrate',
+                                              font=('Arial', 30))
+        self.canvas_drop_Renishaw.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='② Reference file',
+                                              font=('Arial', 30))
+        self.canvas_drop_Raman488 = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
+        self.canvas_drop_Raman488.create_rectangle(0, 0, self.width_canvas, self.height_canvas / 3, fill='lightgray')
+        self.canvas_drop_Raman488.create_rectangle(0, self.height_canvas / 3, self.width_canvas, self.height_canvas * 2 / 3, fill='gray')
+        self.canvas_drop_Raman488.create_rectangle(0, self.height_canvas * 2 / 3, self.width_canvas, self.height_canvas, fill='lightgray')
+        self.canvas_drop_Raman488.create_text(self.width_canvas / 2, self.height_canvas / 6, text='① File to calibrate',
+                                              font=('Arial', 30))
+        self.canvas_drop_Raman488.create_text(self.width_canvas / 2, self.height_canvas / 2, text='② Reference file',
+                                              font=('Arial', 30))
+        self.canvas_drop_Raman488.create_text(self.width_canvas / 2, self.height_canvas * 5 / 6, text='② Reference file',
+                                              font=('Arial', 30))
 
     # 入力のバリデーションの関数，煩雑なのでどうにかしたさある
     def validate_map_range_1(self, after):
@@ -264,6 +290,8 @@ class MainWindow(tk.Frame):
                 self.cmap_range_1.set(round(cmap_range[0]))
                 self.cmap_range_2.set(round(cmap_range[1]))
                 self.canvas.draw()
+            return True
+        elif after == '':
             return True
         else:
             return False
@@ -278,6 +306,8 @@ class MainWindow(tk.Frame):
                 self.cmap_range_2.set(round(cmap_range[1]))
                 self.canvas.draw()
             return True
+        elif after == '':
+            return True
         else:
             return False
 
@@ -289,6 +319,8 @@ class MainWindow(tk.Frame):
                 self.map_manager.update_map(cmap_range=(float(after), self.cmap_range_2.get()))
                 self.canvas.draw()
             return True
+        elif after == '':
+            return True
         else:
             return False
 
@@ -296,9 +328,11 @@ class MainWindow(tk.Frame):
         if not self.map_manager.is_loaded:
             return False
         if is_num(after):
-            if self.cmap_range_2.get() < float(after):
-                self.map_manager.update_map((self.cmap_range_2.get(), float(after)))
+            if self.cmap_range_1.get() < float(after):
+                self.map_manager.update_map((self.cmap_range_1.get(), float(after)))
                 self.canvas.draw()
+            return True
+        elif after == '':
             return True
         else:
             return False
@@ -398,6 +432,7 @@ class MainWindow(tk.Frame):
             self.ax_raw.autoscale(True)
             self.line[0].remove()
             self.ax_raw.cla()
+            self.ax_raw.set_title('Spectrum', fontsize=30)
         else:
             self.ax_raw.autoscale(False)
             self.line[0].remove()
@@ -441,7 +476,8 @@ class MainWindow(tk.Frame):
     def drop(self, event: TkinterDnD.DnDEvent) -> None:
         # ドラッグ&ドロップされたファイルを処理
         # 誘導用の長方形を見えないように
-        self.canvas_drop.place_forget()
+        self.canvas_drop_Renishaw.place_forget()
+        self.canvas_drop_Raman488.place_forget()
 
         # パスによって形式が違う
         # 複数個選択しても1個しか読み込まない
@@ -452,11 +488,6 @@ class MainWindow(tk.Frame):
 
         # TODO: pathlibを使う
 
-        # wdfファイルのみ受け付ける
-        if filename.split('.')[-1] != 'wdf':
-            messagebox.showerror('Error', 'Only .wdf files are acceptable.')
-            return
-
         # どこにdropしたかでマッピングファイルなのか、標準サンプルファイルなのか仕分ける
         master_geometry = list(map(int, self.master.winfo_geometry().split('+')[1:]))
         dropped_place = (event.y_root - master_geometry[1] - 30) / self.height_canvas
@@ -466,51 +497,139 @@ class MainWindow(tk.Frame):
         else:
             threshold = 0.5
 
-        if dropped_place > threshold:  # reference data
-            self.calibrator.reset_ref()
-            has_same_xdata = self.calibrator.load_ref(filename)
-            if not has_same_xdata:
-                messagebox.showerror('Error', 'X-axis data does not match. Choose reference data with same measurement condition as the map data.')
+        if self.mode == 'Renishaw':
+            if dropped_place < threshold:
+                self.load_raw(filename)
+            else:
+                self.load_ref(filename)
+        elif self.mode == 'Raman488':
+            if dropped_place < threshold * 2 / 3:
+                self.load_raw(filename)
+            elif dropped_place < threshold * 4 / 3:
+                self.load_ref(filename)
+            else:
+                self.load_bg(filename)
+
+    def load_raw(self, filename: str) -> None:
+        self.reset()
+
+        if filename.split('.')[-1] == 'wdf':
+            self.calibrator = RenishawCalibrator()
+            self.mode = 'Renishaw'
+            self.forget_bg_widgets()
+        elif filename.split('.')[-1] == 'hdf5':
+            self.mode = 'Raman488'
+            self.calibrator = Raman488Calibrator()
+            self.remember_bg_widgets()
+        else:
+            messagebox.showerror('Error', 'Only .wdf or .hdf5 files are acceptable.')
+            return
+
+        self.calibrator.set_ax(self.ax_ref)
+        ok, map_info = self.calibrator.load_raw(filename=filename)
+        if not ok:
+            messagebox.showerror('Error', 'Choose map data.')
+            return
+        self.map_manager.load(map_info)
+
+        if self.mode == 'Raman488':
+            self.processor = Raman488DataProcessor(map_info=map_info)
+
+        self.filename_raw.set(os.path.basename(filename))
+        self.folder_raw = os.path.dirname(filename)
+        self.optionmenu_map_range.config(state=tk.ACTIVE)
+        self.optionmenu_map_color.config(state=tk.ACTIVE)
+        self.map_manager.clear_and_show()
+        self.on_change_cmap_settings()
+        self.update_plot()
+        self.tooltip_raw.set(filename)
+
+    def load_ref(self, filename: str) -> None:
+        if self.calibrator is None:
+            messagebox.showerror('Error', 'Choose map data first.')
+            return
+
+        # ファイル形式を確認
+        if self.mode == 'Renishaw':
+            if filename.split('.')[-1] != 'wdf':
+                messagebox.showerror('Error', 'Only .wdf files are acceptable.')
                 return
-            self.filename_ref.set(os.path.basename(filename))
-            self.folder_ref = os.path.dirname(filename)
-            for material in self.calibrator.get_material_list():
-                if material in filename:
-                    self.material.set(material)
-            self.button_calibrate.config(state=tk.ACTIVE)
-            self.show_ref()
-            self.tooltip_ref.set(filename)
-        else:  # raw data
-            self.reset()
-            ok, map_info = self.calibrator.load_raw(filename)
-            if not ok:
-                messagebox.showerror('Error', 'Choose map data.')
+        elif self.mode == 'Raman488':
+            if filename.split('.')[-1] != 'hdf5':
+                messagebox.showerror('Error', 'Only .hdf5 files are acceptable.')
                 return
-            self.map_manager.load(map_info)
-            self.filename_raw.set(os.path.basename(filename))
-            self.folder_raw = os.path.dirname(filename)
-            self.optionmenu_map_range.config(state=tk.ACTIVE)
-            self.optionmenu_map_color.config(state=tk.ACTIVE)
-            self.map_manager.clear_and_show()
-            self.on_change_cmap_settings()
-            self.update_plot()
-            self.tooltip_raw.set(filename)
+
+        self.calibrator.reset_ref()
+        has_same_xdata = self.calibrator.load_ref(filename)
+        if not has_same_xdata:
+            messagebox.showerror('Error',
+                                 'X-axis data does not match. Choose reference data with same measurement condition as the map data.')
+            return
+        self.filename_ref.set(os.path.basename(filename))
+        self.folder_ref = os.path.dirname(filename)
+        for material in self.calibrator.get_material_list():
+            if material in filename:
+                self.material.set(material)
+        self.button_calibrate.config(state=tk.ACTIVE)
+        self.show_ref()
+        self.tooltip_ref.set(filename)
+
+    def load_bg(self, filename) -> None:
+        self.filename_bg.set(os.path.basename(filename))
+        self.folder_bg = os.path.dirname(filename)
+        self.tooltip_bg.set(filename)
+        self.processor.load_bg(filename)
+        self.subtract_bg.set(True)
+        self.process()
 
     def drop_enter(self, event: TkinterDnD.DnDEvent) -> None:
-        self.canvas_drop.place(anchor='nw', x=0, y=0)
+        if self.mode == 'Renishaw':
+            self.canvas_drop_Renishaw.place(anchor='nw', x=0, y=0)
+        elif self.mode == 'Raman488':
+            self.canvas_drop_Raman488.place(anchor='nw', x=0, y=0)
 
     def drop_leave(self, event: TkinterDnD.DnDEvent) -> None:
-        self.canvas_drop.place_forget()
+        self.canvas_drop_Renishaw.place_forget()
+        self.canvas_drop_Raman488.place_forget()
+
+    def forget_bg_widgets(self) -> None:
+        self.checkbox_subtract_bg.grid_forget()
+        self.label_bg.grid_forget()
+        self.label_filename_bg.grid_forget()
+        self.checkbox_remove_cosmic_ray.grid_forget()
+
+    def remember_bg_widgets(self) -> None:
+        self.label_bg.grid(row=2, column=0)
+        self.label_filename_bg.grid(row=2, column=1)
+        self.checkbox_subtract_bg.grid(row=3, column=0, columnspan=2)
+        self.checkbox_remove_cosmic_ray.grid(row=4, column=0, columnspan=2)
+
+    def process(self) -> None:
+        # バックグラウンド，宇宙線除去
+        if self.subtract_bg.get() and self.processor is None:
+            messagebox.showerror('Error', 'Choose background data.')
+            self.subtract_bg.set(False)
+            return
+        self.processor.set_processed_data(is_bg_subtracted=self.subtract_bg.get(), is_cosmic_ray_removed=self.remove_cosmic_ray.get())
+        self.update_plot()
+        self.canvas.draw()
 
     def reset(self) -> None:
-        # マッピングデータのリセット
-        self.calibrator.reset()
+        if self.calibrator is not None:
+            self.calibrator.close()  # TODO: calibratorクラスがファイルを管理してるのがよくない
+        self.calibrator = None
+        if self.processor is not None:
+            self.processor.reset()
+        self.processor = None
         self.map_manager.reset()
         self.map_manager.map_range = (self.map_range_1.get(), self.map_range_2.get())
         self.filename_raw.set('please drag & drop!')
         self.filename_ref.set('please drag & drop!')
+        self.filename_bg.set('not loaded')
         self.folder_raw = './'
         self.folder_ref = './'
+        self.folder_bg = './'
+        self.forget_bg_widgets()
         self.button_calibrate.config(state=tk.DISABLED)
         self.row = 0
         self.col = 0
@@ -585,15 +704,16 @@ class MainWindow(tk.Frame):
         if not folder_to_save:
             return
 
-        xdata = self.map_manager.xdata
+        xdata = self.map_manager.map_info.xdata
         for child in self.treeview.get_children():
             col, row = self.treeview.item(child)['values']
-            spectrum = self.map_manager.map_data[row][col]
+            spectrum = self.map_manager.map_info.map_data[row][col]
             abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
-            if self.filename_ref.get() == 'please drag & drop!':
+            if not self.calibrator.is_calibrated:
                 abs_path_ref = ''
             else:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
+            # TODO: bg をひいていたらそれも書き込む
             filename = os.path.join(folder_to_save, self.construct_filename(ix=col, iy=row))
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
@@ -604,7 +724,8 @@ class MainWindow(tk.Frame):
                     f.write(f'{x},{y}\n')
 
     def quit(self) -> None:
-        self.calibrator.close()
+        if self.calibrator is not None:
+            self.calibrator.close()
         self.master.quit()
         self.master.destroy()
 

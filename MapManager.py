@@ -2,12 +2,22 @@ import numpy as np
 from PIL import Image
 import matplotlib
 from matplotlib.colors import Normalize
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 def subtract_baseline(data: np.ndarray):
     baseline = np.linspace(data[0], data[-1], data.shape[0])
     return data - baseline
+
+
+def remove_cosmic_ray(spectra: np.ndarray, threshold: float):
+    mean = spectra.mean(axis=2)
+    std = spectra.std()
+    deviation = (spectra - mean[:, :, np.newaxis, :]) / std
+    mask = np.where(deviation > threshold, 0, 1)
+    spectra_removed = spectra * mask
+    spectra_average = spectra_removed.sum(axis=2)[:, :, np.newaxis, :] / mask.sum(axis=2)[:, :, np.newaxis, :] * (1 - mask)
+    return spectra_removed + spectra_average
 
 
 @dataclass
@@ -21,6 +31,9 @@ class MapInfo:  # マッピングの情報をまとめたクラス，複数の�
     img: Image
     img_origin: tuple
     img_size: tuple
+    map_data_4d: np.ndarray = field(default_factory=lambda: np.array([[[[]]]]))
+    map_data_mean: np.ndarray = field(default_factory=lambda: np.array([[[]]]))
+    map_data_crr: np.ndarray = field(default_factory=lambda: np.array([[[]]]))
 
 
 class MapManager:
@@ -86,6 +99,7 @@ class MapManager:
     def clear_and_show(self) -> None:
         # マップをクリア
         self.ax.cla()
+        self.ax.set_title('Raman Map', fontsize=30)
         # 光学像の表示
         self.show_optical_img()
         # ラマンマッピングの描画

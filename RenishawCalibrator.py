@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 from renishawWiRE import WDFReader
@@ -43,6 +42,8 @@ class RenishawCalibrator(Calibrator):
         self.__init__(keep_ax=True)
 
     def reset_ref(self):
+        if self.reader_raw is not None:
+            self.reader_raw.close()
         self.reader_ref = None
         self.is_ref_loaded = False
 
@@ -90,7 +91,7 @@ class RenishawCalibrator(Calibrator):
         self.reader_ref = WDFReader(filename)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
             self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
-            print('Reference data is supposed to be single measurement, but map data was loaded.')
+            print('Warning: Reference file contains multiple spectra. Only the first one is used.')
         if not self.is_xdata_correct():
             return False
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
@@ -113,6 +114,7 @@ class RenishawCalibrator(Calibrator):
 
     def plot(self):
         self.ax.cla()
+        self.ax.set_title('Reference Spectrum', fontsize=30)
         self.ax.autoscale(True)
         if self.is_calibrated:
             self.show_result()
