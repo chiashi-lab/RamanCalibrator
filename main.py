@@ -253,18 +253,16 @@ class MainWindow(tk.Frame):
             self.imshow()
             return
         # column majorに変換
-        iy, ix = self.calibrator.row2col(self.row, self.col)
-        if event.key == 'up' and iy < self.calibrator.shape[0] - 1:
-            iy += 1
-        elif event.key == 'down' and 0 < iy:
-            iy -= 1
-        elif event.key == 'right' and ix < self.calibrator.shape[1] - 1:
-            ix += 1
-        elif event.key == 'left' and 0 < ix:
-            ix -= 1
+        if event.key == 'up' and self.row < self.calibrator.shape[0] - 1:
+            self.row += 1
+        elif event.key == 'down' and 0 < self.row:
+            self.row -= 1
+        elif event.key == 'right' and self.col < self.calibrator.shape[1] - 1:
+            self.col += 1
+        elif event.key == 'left' and 0 < self.col:
+            self.col -= 1
         else:
             return
-        self.row, self.col = self.calibrator.col2row(iy, ix)
         self.update_crosshair()
         self.update_plot()
 
@@ -353,11 +351,10 @@ class MainWindow(tk.Frame):
                 self.line[0].remove()
             else:  # for after calibration
                 self.ax[1].cla()
-        iy, ix = self.calibrator.row2col(self.row, self.col)
         self.line = self.ax[1].plot(
             self.calibrator.xdata,
             self.calibrator.map_data[self.row][self.col],
-            label=f'({ix}, {iy})', color='r', linewidth=0.8)
+            label=f'({self.col}, {self.row})', color='r', linewidth=0.8)
         self.ax[1].legend(fontsize=18)
         self.canvas.draw()
 
@@ -366,8 +363,7 @@ class MainWindow(tk.Frame):
             r.remove()
         self.selection_patches = []
         for child in self.treeview.get_children():
-            idx2, idx1 = self.treeview.item(child)['values']
-            row, col = self.calibrator.col2row(idx1, idx2)
+            col, row = self.treeview.item(child)['values']
             x, y = self.calibrator.idx2coord(row, col)
             x1 = x - self.calibrator.x_pad / 2
             y1 = y - self.calibrator.y_pad / 2
@@ -386,7 +382,7 @@ class MainWindow(tk.Frame):
     def select_from_treeview(self, *args):
         if self.treeview.focus() == '':
             return
-        self.row, self.col = self.calibrator.col2row(*self.treeview.item(self.treeview.focus())['values'][::-1])
+        self.row, self.col = self.treeview.item(self.treeview.focus())['values'][::-1]
         self.update_crosshair()
         self.update_plot()
 
@@ -401,6 +397,8 @@ class MainWindow(tk.Frame):
             filename = event.data.split('} {')[0].strip('{').strip('}')
         else:
             filename = event.data.split()[0]
+
+        # TODO: pathlibを使う
 
         # wdfファイルのみ受け付ける
         if filename.split('.')[-1] != 'wdf':
@@ -471,7 +469,7 @@ class MainWindow(tk.Frame):
     @check_loaded
     def add(self) -> None:
         # 保存リストに追加する
-        index = self.calibrator.row2col(self.row, self.col)[::-1]
+        index = (self.col, self.row)  # (x, y)
 
         # 既に追加されている場合は追加しない
         for child in self.treeview.get_children():
@@ -502,7 +500,7 @@ class MainWindow(tk.Frame):
         idx_to_delete = [self.treeview.item(iid)['values'] for iid in self.treeview.selection()]
         # 何も選択されていない場合、現在の点を削除
         if len(idx_to_delete) == 0:
-            idx_to_delete = [list(self.calibrator.row2col(self.row, self.col))[::-1]]
+            idx_to_delete = [(self.col, self.row)]
 
         for child in self.treeview.get_children():
             if self.treeview.item(child)['values'] in idx_to_delete:
@@ -539,8 +537,7 @@ class MainWindow(tk.Frame):
 
         xdata = self.calibrator.xdata
         for child in self.treeview.get_children():
-            ix, iy = self.treeview.item(child)['values']
-            row, col = self.calibrator.col2row(iy, ix)
+            col, row = self.treeview.item(child)['values']
             spectrum = self.calibrator.map_data[row][col]
             abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
             if self.filename_ref.get() == 'please drag & drop!':

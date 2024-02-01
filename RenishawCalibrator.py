@@ -30,6 +30,14 @@ class RenishawCalibrator(Calibrator):
         self.reader_raw = WDFReader(filename)
         self.xdata = self.reader_raw.xdata.copy()
         self.map_data = self.reader_raw.spectra.copy()
+        map_new = np.zeros_like(self.map_data)
+        for i1 in range(self.map_data.shape[0]):
+            for j1 in range(self.map_data.shape[1]):
+                index = i1 * self.map_data.shape[1] + j1
+                i2 = index % self.map_data.shape[0]
+                j2 = index // self.map_data.shape[0]
+                map_new[i2, j2] = self.map_data[i1, j1]
+        self.map_data = np.array(map_new)
         if len(self.map_data.shape) == 1:  # 点測定データ
             self.map_data = self.map_data.reshape(1, 1, -1)
             # 仮のデータを入れる
@@ -108,38 +116,17 @@ class RenishawCalibrator(Calibrator):
         if data.shape[2] == 0:
             return
         data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
-        data = data.reshape(data.shape[::-1]).T
         # カラーマップ範囲
         cmap_range = [data.min(), data.max()] if cmap_range is None else cmap_range
         # 光学像の上にマッピングを描画
         ax.imshow(data, alpha=alpha, extent=extent_mapping, origin='lower', cmap=cmap, norm=Normalize(vmin=cmap_range[0], vmax=cmap_range[1]))
 
-    def col2row(self, row: int, col: int) -> [int, int]:
-        idx = col * self.shape[0] + row
-        # row major
-        row = idx // self.shape[1]
-        col = idx % self.shape[1]
-
-        return row, col
-
-    def row2col(self, row: int, col: int) -> [int, int]:
-        idx = row * self.shape[1] + col
-        # column major
-        col = idx // self.shape[0]
-        row = idx % self.shape[0]
-
-        return row, col
-
     def coord2idx(self, x_pos: float, y_pos: float) -> [int, int]:
-        # get index of column major
         col = round((x_pos - self.x_start) // self.x_pad)
         row = round((y_pos - self.y_start) // self.y_pad)
-        # change to row major and return it
-        return self.col2row(row, col)
+        return row, col
 
     def idx2coord(self, row: int, col: int) -> [float, float]:
-        # get column major index
-        row, col = self.row2col(row, col)
         return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.5)
 
     def is_inside(self, x: float, y: float) -> bool:
