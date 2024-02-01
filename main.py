@@ -8,6 +8,7 @@ from matplotlib import rcParams, patches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from RenishawCalibrator import RenishawCalibrator
+from MapManager import MapManager
 from MyTooltip import MyTooltip
 
 font_lg = ('Arial', 24)
@@ -25,16 +26,37 @@ plt.rcParams['figure.subplot.left'] = 0.05
 plt.rcParams['figure.subplot.right'] = 0.95
 
 
-def check_loaded(func):
+def check_map_loaded(func):
     # マッピングデータが読み込まれているか確認するデコレータ
     # 読み込まれていない場合，エラーメッセージを表示する
-    def wrapper(self, *args, **kwargs):
-        if self.filename_raw.get() == 'please drag & drop!':
+    def wrapper(*args, **kwargs):
+        if not args[0].map_manager.is_loaded:
             messagebox.showerror('Error', 'Choose map data.')
             return
-        return func(self, *args, **kwargs)
+        return func(*args, **kwargs)
 
     return wrapper
+
+
+def check_ref_loaded(func):
+    # リファレンスデータが読み込まれているか確認するデコレータ
+    # 読み込まれていない場合，エラーメッセージを表示する
+    def wrapper(*args, **kwargs):
+        if not args[0].calibrator.is_ref_loaded:
+            messagebox.showerror('Error', 'Choose reference data.')
+            return
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def is_num(s):
+    try:
+        float(s)
+    except ValueError:
+        return False
+    else:
+        return True
 
 
 class MainWindow(tk.Frame):
@@ -43,11 +65,14 @@ class MainWindow(tk.Frame):
         self.master = master
         self.master.title('Renishaw Calibrator')
 
-        self.calibrator = RenishawCalibrator()
+        self.calibrator: RenishawCalibrator = RenishawCalibrator()
+        self.map_manager: MapManager = MapManager()
 
         self.row = self.col = 0
 
-        self.ax: list[plt.Axes] = []
+        self.ax_map: plt.Axes = None
+        self.ax_raw: plt.Axes = None
+        self.ax_ref: plt.Axes = None
 
         self.line = None
         self.selection_patches = []
@@ -56,6 +81,8 @@ class MainWindow(tk.Frame):
         self.folder_ref = './'
 
         self.create_widgets()
+        self.map_manager.set_ax(self.ax_map)
+        self.calibrator.set_ax(self.ax_ref)
 
     def create_widgets(self) -> None:
         style = ttk.Style()
@@ -69,13 +96,19 @@ class MainWindow(tk.Frame):
         style.configure('Treeview', font=font_md, foreground='black')
         style.configure('Treeview.Heading', font=font_md, foreground='black')
         # canvas
-        self.width_canvas = 1200
+        self.width_canvas = 1400
         self.height_canvas = 800
         dpi = 50
         if os.name == 'posix':
             self.width_canvas /= 2
             self.height_canvas /= 2
-        fig, self.ax = plt.subplots(1, 2, figsize=(self.width_canvas / dpi, self.height_canvas / dpi), dpi=dpi)
+        fig = plt.figure(figsize=(self.width_canvas / dpi, self.height_canvas / dpi), dpi=dpi)
+        self.ax_map = fig.add_subplot(121)
+        self.ax_raw = fig.add_subplot(222)
+        self.ax_ref = fig.add_subplot(224)
+        self.ax_map.set_title('Raman Map', fontsize=30)
+        self.ax_raw.set_title('Spectrum', fontsize=30)
+        self.ax_ref.set_title('Reference Spectrum', fontsize=30)
         self.canvas = FigureCanvasTkAgg(fig, self.master)
         self.canvas.get_tk_widget().grid(row=0, column=0, rowspan=10)
         toolbar = NavigationToolbar2Tk(self.canvas, self.master, pack_toolbar=False)
@@ -109,7 +142,7 @@ class MainWindow(tk.Frame):
         self.material = tk.StringVar(value=self.calibrator.get_material_list()[0])
         self.dimension = tk.StringVar(value=self.calibrator.get_dimension_list()[0])
         self.function = tk.StringVar(value=self.calibrator.get_function_list()[0])
-        optionmenu_material = ttk.OptionMenu(frame_data, self.material, self.material.get(), *self.calibrator.get_material_list())
+        optionmenu_material = ttk.OptionMenu(frame_data, self.material, self.material.get(), *self.calibrator.get_material_list(), command=self.show_ref)
         optionmenu_dimension = ttk.OptionMenu(frame_data, self.dimension, self.dimension.get(), *self.calibrator.get_dimension_list())
         optionmenu_function = ttk.OptionMenu(frame_data, self.function, self.function.get(), *self.calibrator.get_function_list())
         optionmenu_material['menu'].config(font=font_md)
@@ -153,22 +186,26 @@ class MainWindow(tk.Frame):
         checkbox_show_selection_in_map.grid(row=3, column=0, columnspan=3)
 
         # frame_map
+        vmr1 = (self.register(self.validate_map_range_1), '%P')
+        vmr2 = (self.register(self.validate_map_range_2), '%P')
+        vcmr1 = (self.register(self.validate_cmap_range_1), '%P')
+        vcmr2 = (self.register(self.validate_cmap_range_2), '%P')
+        va = (self.register(self.validate_alpha), '%P')
         label_map_range = ttk.Label(frame_map, text='Map Range')
-        self.map_range = tk.StringVar(value='G(1570~1610)')
-        self.optionmenu_map_range = ttk.OptionMenu(frame_map, self.map_range, 'G(1570~1610)', '2D(2550~2750)',
-                                                  command=self.change_map_range)
+        self.map_range = tk.StringVar(value='1570~1610')
+        self.optionmenu_map_range = ttk.OptionMenu(frame_map, self.map_range, self.map_manager.map_range_list[3], *self.map_manager.map_range_list,
+                                                   command=self.select_map_range_preset)
         self.optionmenu_map_range.config(state=tk.DISABLED)
         self.optionmenu_map_range['menu'].config(font=font_md)
         self.map_range_1 = tk.DoubleVar(value=1570)
         self.map_range_2 = tk.DoubleVar(value=1610)
-        entry_map_range_1 = ttk.Entry(frame_map, textvariable=self.map_range_1, justify=tk.CENTER, font=font_md, width=6)
-        entry_map_range_2 = ttk.Entry(frame_map, textvariable=self.map_range_2, justify=tk.CENTER, font=font_md, width=6)
+        self.entry_map_range_1 = ttk.Entry(frame_map, textvariable=self.map_range_1, validate="key", validatecommand=vmr1, justify=tk.CENTER, font=font_md, width=6)
+        self.entry_map_range_2 = ttk.Entry(frame_map, textvariable=self.map_range_2, validate="key", validatecommand=vmr2, justify=tk.CENTER, font=font_md, width=6)
         label_cmap_range = ttk.Label(frame_map, text='Color Range')
         self.cmap_range_1 = tk.DoubleVar(value=0)
         self.cmap_range_2 = tk.DoubleVar(value=10000)
-        self.entry_cmap_range_1 = tk.Entry(frame_map, textvariable=self.cmap_range_1, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
-        self.entry_cmap_range_2 = tk.Entry(frame_map, textvariable=self.cmap_range_2, justify=tk.CENTER, font=font_md, width=6, state=tk.DISABLED)
-        self.button_apply = ttk.Button(frame_map, text='APPLY', command=self.imshow, state=tk.DISABLED)
+        self.entry_cmap_range_1 = ttk.Entry(frame_map, textvariable=self.cmap_range_1, validate="key", validatecommand=vcmr1, justify=tk.CENTER, font=font_md, width=6)
+        self.entry_cmap_range_2 = ttk.Entry(frame_map, textvariable=self.cmap_range_2, validate="key", validatecommand=vcmr2, justify=tk.CENTER, font=font_md, width=6)
         self.map_color = tk.StringVar(value='hot')
         label_map_color = ttk.Label(frame_map, text='Color Map')
         self.optionmenu_map_color = ttk.OptionMenu(frame_map, self.map_color, self.map_color.get(),
@@ -178,22 +215,21 @@ class MainWindow(tk.Frame):
                                                     'RdBu', 'Spectral', 'bwr', 'coolwarm', 'hsv', 'twilight',
                                                     'CMRmap', 'cubehelix', 'brg', 'gist_rainbow', 'rainbow',
                                                     'jet', 'nipy_spectral', 'gist_ncar']),
-                                                   command=self.imshow)
+                                                   command=self.on_change_cmap_settings)
         self.optionmenu_map_color.config(state=tk.DISABLED)
         self.optionmenu_map_color['menu'].config(font=font_md)
         label_alpha = ttk.Label(frame_map, text='Alpha')
         self.alpha = tk.DoubleVar(value=1)
-        entry_alpha = tk.Entry(frame_map, textvariable=self.alpha, justify=tk.CENTER, font=font_md, width=6)
+        entry_alpha = ttk.Entry(frame_map, textvariable=self.alpha, validate='key', validatecommand=va, justify=tk.CENTER, font=font_md, width=6)
         self.map_autoscale = tk.BooleanVar(value=True)
-        checkbox_map_autoscale = ttk.Checkbutton(frame_map, text='Color Map Auto Scale', command=self.on_map_autoscale, variable=self.map_autoscale, takefocus=False)
+        checkbox_map_autoscale = ttk.Checkbutton(frame_map, text='Color Map Auto Scale', command=self.on_change_cmap_settings, variable=self.map_autoscale, takefocus=False)
         self.show_crosshair = tk.BooleanVar(value=True)
         checkbox_show_crosshair = ttk.Checkbutton(frame_map, text='Show Crosshair', command=self.update_crosshair, variable=self.show_crosshair, takefocus=False)
 
         label_map_range.grid(row=0, column=0, rowspan=2)
         self.optionmenu_map_range.grid(row=0, column=1, columnspan=2, sticky=tk.EW)
-        self.button_apply.grid(row=0, column=3, rowspan=5, sticky=tk.NS)
-        entry_map_range_1.grid(row=1, column=1)
-        entry_map_range_2.grid(row=1, column=2)
+        self.entry_map_range_1.grid(row=1, column=1)
+        self.entry_map_range_2.grid(row=1, column=2)
         label_cmap_range.grid(row=2, column=0)
         self.entry_cmap_range_1.grid(row=2, column=1)
         self.entry_cmap_range_2.grid(row=2, column=2)
@@ -207,10 +243,7 @@ class MainWindow(tk.Frame):
         # frame_plot
         self.spec_autoscale = tk.BooleanVar(value=True)
         checkbox_spec_autoscale = ttk.Checkbutton(frame_plot, text='Spectrum Auto Scale', variable=self.spec_autoscale, takefocus=False)
-        self.button_show_ref = ttk.Button(frame_plot, text='SHOW REFERENCE', command=self.show_ref, takefocus=False, state=tk.DISABLED)
-
         checkbox_spec_autoscale.grid(row=0, column=0)
-        self.button_show_ref.grid(row=1, column=0, sticky=tk.EW)
 
         # canvas_drop
         self.canvas_drop = tk.Canvas(self.master, width=self.width_canvas, height=self.height_canvas)
@@ -221,6 +254,69 @@ class MainWindow(tk.Frame):
         self.canvas_drop.create_text(self.width_canvas / 2, self.height_canvas * 3 / 4, text='② Reference .wdf File',
                                      font=('Arial', 30))
 
+    # 入力のバリデーションの関数，煩雑なのでどうにかしたさある
+    def validate_map_range_1(self, after):
+        if not self.map_manager.is_loaded:
+            return False
+        if is_num(after):
+            if float(after) < self.map_range_2.get():
+                cmap_range = self.map_manager.update_map(map_range=(float(after), self.map_range_2.get()))
+                self.cmap_range_1.set(round(cmap_range[0]))
+                self.cmap_range_2.set(round(cmap_range[1]))
+                self.canvas.draw()
+            return True
+        else:
+            return False
+
+    def validate_map_range_2(self, after):
+        if not self.map_manager.is_loaded:
+            return False
+        if is_num(after):
+            if self.map_range_1.get() < float(after):
+                cmap_range = self.map_manager.update_map(map_range=(self.map_range_1.get(), float(after)))
+                self.cmap_range_1.set(round(cmap_range[0]))
+                self.cmap_range_2.set(round(cmap_range[1]))
+                self.canvas.draw()
+            return True
+        else:
+            return False
+
+    def validate_cmap_range_1(self, after):
+        if not self.map_manager.is_loaded:
+            return False
+        if is_num(after):
+            if float(after) < self.cmap_range_2.get():
+                self.map_manager.update_map(cmap_range=(float(after), self.cmap_range_2.get()))
+                self.canvas.draw()
+            return True
+        else:
+            return False
+
+    def validate_cmap_range_2(self, after):
+        if not self.map_manager.is_loaded:
+            return False
+        if is_num(after):
+            if self.cmap_range_2.get() < float(after):
+                self.map_manager.update_map((self.cmap_range_2.get(), float(after)))
+                self.canvas.draw()
+            return True
+        else:
+            return False
+
+    def validate_alpha(self, after):
+        if not self.map_manager.is_loaded:
+            return False
+        if is_num(after) and 0 <= float(after) <= 1:
+            self.map_manager.update_map(alpha=float(after))
+            self.canvas.draw()
+            return True
+        elif after == '':
+            return True
+        else:
+            return False
+
+    @check_map_loaded
+    @check_ref_loaded
     def calibrate(self) -> None:
         self.calibrator.set_dimension(int(self.dimension.get()[0]))
         self.calibrator.set_material(self.material.get())
@@ -230,145 +326,99 @@ class MainWindow(tk.Frame):
         if not ok:
             messagebox.showerror('Error', 'Peaks not found.')
             return
-        self.ax[1].cla()
-        self.calibrator.show_fit_result(self.ax[1])
+        self.calibrator.plot()
+        self.map_manager.update_xdata(self.calibrator.xdata)
+        self.update_plot()
         self.canvas.draw()
-        self.line = None
 
+    @check_map_loaded
     def on_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
         # クリックした点のスペクトルを表示する
-        if self.filename_raw.get() == 'please drag & drop!':
-            return
         if event.xdata is None or event.ydata is None:
             return
-        if not self.calibrator.is_inside(event.xdata, event.ydata):
-            return
-        self.row, self.col = self.calibrator.coord2idx(event.xdata, event.ydata)
-        self.update_crosshair()
+        self.map_manager.on_click(event.xdata, event.ydata)
         self.update_plot()
 
+    @check_map_loaded
     def key_pressed(self, event: matplotlib.backend_bases.KeyEvent) -> None:
-        # 矢印キーで表示するスペクトルを変えられる
-        if event.key == 'enter':
-            self.imshow()
-            return
-        # column majorに変換
-        if event.key == 'up' and self.row < self.calibrator.shape[0] - 1:
-            self.row += 1
-        elif event.key == 'down' and 0 < self.row:
-            self.row -= 1
-        elif event.key == 'right' and self.col < self.calibrator.shape[1] - 1:
-            self.col += 1
-        elif event.key == 'left' and 0 < self.col:
-            self.col -= 1
-        else:
-            return
-        self.update_crosshair()
+        self.map_manager.on_key_press(event.key)
         self.update_plot()
 
-    def change_map_range(self, *args) -> None:
-        if self.map_range.get() == 'G(1570~1610)':
-            self.map_range_1.set(1570)
-            self.map_range_2.set(1610)
-        elif self.map_range.get() == '2D(2550~2750)':
-            self.map_range_1.set(2550)
-            self.map_range_2.set(2750)
-        self.imshow()
+    @check_map_loaded
+    def select_map_range_preset(self, *args) -> None:
+        x1, x2 = map(int, self.map_range.get().split('~'))
+        self.map_range_1.set(x1)
+        self.map_range_2.set(x2)
+        self.map_manager.update_map(map_range=(x1, x2))
+        self.canvas.draw()
 
-    def on_map_autoscale(self, *args) -> None:
+    @check_map_loaded
+    def on_change_map_range(self, *args) -> None:
+        self.map_manager.update_map(map_range=(self.map_range_1.get(), self.map_range_2.get()))
+        self.canvas.draw()
+
+    @check_map_loaded
+    def on_change_cmap_settings(self, *args) -> None:
         if self.map_autoscale.get():
             self.entry_cmap_range_1.config(state=tk.DISABLED)
             self.entry_cmap_range_2.config(state=tk.DISABLED)
         else:
             self.entry_cmap_range_1.config(state=tk.NORMAL)
             self.entry_cmap_range_2.config(state=tk.NORMAL)
-
-    def imshow(self, *args) -> None:
-        self.ax[0].cla()
-        self.create_crosshair()
-        try:
-            cmap_range = [self.cmap_range_1.get(), self.cmap_range_2.get()] if not self.map_autoscale.get() else None
-            self.calibrator.imshow(
-                self.ax[0],
-                [self.map_range_1.get(), self.map_range_2.get()],
-                self.map_color.get(),
-                cmap_range,
-                self.alpha.get()
-            )
-            self.update_selection()
-        except ValueError as e:
-            print('ValueError', e)
-
-    def show_ref(self, *args) -> None:
-        if self.filename_ref.get() == 'please drag & drop!':
-            return
-        plt.autoscale(True)
-        if self.line is not None:
-            self.line[0].remove()
-        else:
-            self.ax[1].cla()
-
-        try:  # キャリブレーション済みの場合はキャリブレーション結果を表示
-            self.calibrator.show_fit_result(self.ax[1])
-            self.line = None
-        except ValueError:  # 未キャリブレーションの場合は生データを表示
-            self.line = self.ax[1].plot(
-                self.calibrator.xdata,
-                self.calibrator.ydata,
-                label=self.material.get(), color='k')
-            self.ax[1].legend()
+        cmap_range = self.map_manager.update_map(
+            cmap=self.map_color.get(),
+            cmap_range=(self.cmap_range_1.get(), self.cmap_range_2.get()),
+            cmap_range_auto=self.map_autoscale.get(),
+            alpha=self.alpha.get())
+        # カラーマップの範囲を更新
+        self.cmap_range_1.set(round(cmap_range[0]))
+        self.cmap_range_2.set(round(cmap_range[1]))
         self.canvas.draw()
 
-    def create_crosshair(self) -> None:
-        self.horizontal_line = self.ax[0].axhline(color='k', lw=2, ls=(0, (5, 5)), gapcolor='w')
-        self.vertical_line = self.ax[0].axvline(color='k', lw=2, ls=(0, (5, 5)), gapcolor='w')
-        self.update_crosshair()
+    @check_ref_loaded
+    def show_ref(self, *args) -> None:
+        self.calibrator.set_material(self.material.get())
+        self.calibrator.plot()
+        self.canvas.draw()
 
+    @check_map_loaded
     def update_crosshair(self) -> None:
         # マッピング上のクロスヘアを移動
-        x, y = self.calibrator.idx2coord(self.row, self.col)
-        self.horizontal_line.set_ydata(y)
-        self.vertical_line.set_xdata(x)
-
-        if self.show_crosshair.get():
-            self.horizontal_line.set_visible(True)
-            self.vertical_line.set_visible(True)
-        else:
-            self.horizontal_line.set_visible(False)
-            self.vertical_line.set_visible(False)
+        self.map_manager.show_crosshair = self.show_crosshair.get()
+        self.map_manager.update_crosshair()
         self.canvas.draw()
 
+    @check_map_loaded
     def update_plot(self) -> None:
-        if not (0 <= self.row < self.calibrator.shape[0] and 0 <= self.col < self.calibrator.shape[1]):
-            return
-
-        if self.spec_autoscale.get():
-            plt.autoscale(True)
-            self.ax[1].cla()
+        if self.line is None:
+            self.ax_raw.autoscale(True)
+        elif self.spec_autoscale.get():
+            self.ax_raw.autoscale(True)
+            self.line[0].remove()
+            self.ax_raw.cla()
         else:
-            if self.line is not None:
-                plt.autoscale(False)  # The very first time requires autoscale
-                self.line[0].remove()
-            else:  # for after calibration
-                self.ax[1].cla()
-        self.line = self.ax[1].plot(
-            self.calibrator.xdata,
-            self.calibrator.map_data[self.row][self.col],
-            label=f'({self.col}, {self.row})', color='r', linewidth=0.8)
-        self.ax[1].legend(fontsize=18)
+            self.ax_raw.autoscale(False)
+            self.line[0].remove()
+        iy, ix = self.map_manager.row, self.map_manager.col
+        self.line = self.ax_raw.plot(
+            *self.map_manager.get_spectrum(),
+            label=f'({ix}, {iy})', color='r', linewidth=0.8)
+        self.ax_raw.legend(fontsize=18)
         self.canvas.draw()
 
+    @check_map_loaded
     def update_selection(self):
         for r in self.selection_patches:
             r.remove()
         self.selection_patches = []
         for child in self.treeview.get_children():
             col, row = self.treeview.item(child)['values']
-            x, y = self.calibrator.idx2coord(row, col)
-            x1 = x - self.calibrator.x_pad / 2
-            y1 = y - self.calibrator.y_pad / 2
-            r = patches.Rectangle((x1, y1), self.calibrator.x_pad, self.calibrator.y_pad, fill=False, edgecolor='white', lw=1)
-            self.ax[0].add_patch(r)
+            xc, yc = self.map_manager.idx2coord(row, col)  # center of the pixel
+            xp, yp = self.map_manager.map_info.map_pixel  # pixel size
+            x0 = xc - xp / 2
+            y0 = yc - yp / 2
+            r = patches.Rectangle((x0, y0), xp, yp, fill=False, edgecolor='white', lw=1)
+            self.ax_map.add_patch(r)
             self.selection_patches.append(r)
 
         if not self.show_selection_in_map.get():
@@ -415,6 +465,7 @@ class MainWindow(tk.Frame):
             threshold = 0.5
 
         if dropped_place > threshold:  # reference data
+            self.calibrator.reset_ref()
             has_same_xdata = self.calibrator.load_ref(filename)
             if not has_same_xdata:
                 messagebox.showerror('Error', 'X-axis data does not match. Choose reference data with same measurement condition as the map data.')
@@ -425,22 +476,21 @@ class MainWindow(tk.Frame):
                 if material in filename:
                     self.material.set(material)
             self.button_calibrate.config(state=tk.ACTIVE)
-            self.button_show_ref.config(state=tk.ACTIVE)
             self.show_ref()
             self.tooltip_ref.set(filename)
         else:  # raw data
             self.reset()
-            ok = self.calibrator.load_raw(filename)
+            ok, map_info = self.calibrator.load_raw(filename)
             if not ok:
                 messagebox.showerror('Error', 'Choose map data.')
                 return
+            self.map_manager.load(map_info)
             self.filename_raw.set(os.path.basename(filename))
             self.folder_raw = os.path.dirname(filename)
-
             self.optionmenu_map_range.config(state=tk.ACTIVE)
-            self.button_apply.config(state=tk.ACTIVE)
             self.optionmenu_map_color.config(state=tk.ACTIVE)
-            self.imshow()
+            self.map_manager.clear_and_show()
+            self.on_change_cmap_settings()
             self.update_plot()
             self.tooltip_raw.set(filename)
 
@@ -453,23 +503,21 @@ class MainWindow(tk.Frame):
     def reset(self) -> None:
         # マッピングデータのリセット
         self.calibrator.reset()
+        self.map_manager.reset()
+        self.map_manager.map_range = (self.map_range_1.get(), self.map_range_2.get())
         self.filename_raw.set('please drag & drop!')
         self.filename_ref.set('please drag & drop!')
         self.folder_raw = './'
         self.folder_ref = './'
         self.button_calibrate.config(state=tk.DISABLED)
-        self.button_show_ref.config(state=tk.DISABLED)
-        self.button_apply.config(state=tk.DISABLED)
-        self.optionmenu_map_range.config(state=tk.DISABLED)
-        self.optionmenu_map_color.config(state=tk.DISABLED)
         self.row = 0
         self.col = 0
         self.treeview.delete(*self.treeview.get_children())
 
-    @check_loaded
+    @check_map_loaded
     def add(self) -> None:
         # 保存リストに追加する
-        index = (self.col, self.row)  # (x, y)
+        index = (self.map_manager.col, self.map_manager.row)  # (x, y)
 
         # 既に追加されている場合は追加しない
         for child in self.treeview.get_children():
@@ -479,17 +527,17 @@ class MainWindow(tk.Frame):
         self.treeview.yview_moveto(1)
         self.update_selection()
 
-    @check_loaded
+    @check_map_loaded
     def add_all(self) -> None:
         # 全ての点を保存リストに追加
-        all_indices = [[idx2, idx1] for idx2 in range(self.calibrator.shape[1]) for idx1 in
-                       range(self.calibrator.shape[0])]
+        all_indices = [[idx2, idx1] for idx2 in range(self.map_manager.shape[1]) for idx1 in
+                       range(self.map_manager.shape[0])]
         self.treeview.delete(*self.treeview.get_children())
         for index in all_indices:
             self.treeview.insert('', tk.END, text='', values=index)
         self.update_selection()
 
-    @check_loaded
+    @check_map_loaded
     def delete(self, event=None) -> None:
         # 保存リストから削除
         # 右クリックから呼ばれた場合、ダイアログを表示
@@ -508,7 +556,7 @@ class MainWindow(tk.Frame):
 
         self.update_selection()
 
-    @check_loaded
+    @check_map_loaded
     def delete_all(self) -> None:
         # 保存リストから全て削除
         if not messagebox.askyesno('Confirmation', 'Delete all?'):
@@ -518,7 +566,7 @@ class MainWindow(tk.Frame):
 
     def construct_filename(self, ix: int, iy: int) -> str:
         filename, ext = os.path.splitext(self.filename_raw.get())
-        ny, nx = self.calibrator.map_data.shape[:2]
+        ny, nx = self.map_manager.map_info.shape
         # 0埋め
         ix = str(ix).zfill(len(str(nx)))
         iy = str(iy).zfill(len(str(ny)))
@@ -535,16 +583,16 @@ class MainWindow(tk.Frame):
         if not folder_to_save:
             return
 
-        xdata = self.calibrator.xdata
+        xdata = self.map_manager.xdata
         for child in self.treeview.get_children():
             col, row = self.treeview.item(child)['values']
-            spectrum = self.calibrator.map_data[row][col]
+            spectrum = self.map_manager.map_data[row][col]
             abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
             if self.filename_ref.get() == 'please drag & drop!':
                 abs_path_ref = ''
             else:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
-            filename = os.path.join(folder_to_save, self.construct_filename(ix, iy))
+            filename = os.path.join(folder_to_save, self.construct_filename(ix=col, iy=row))
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')

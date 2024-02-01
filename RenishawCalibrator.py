@@ -1,9 +1,9 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
 from renishawWiRE import WDFReader
 from calibrator import Calibrator
+from MapManager import MapInfo
 
 
 def subtract_baseline(data: np.ndarray):
@@ -11,66 +11,79 @@ def subtract_baseline(data: np.ndarray):
     return data - baseline
 
 
+def column_to_row(data: np.ndarray):
+    # change data from column major to row major
+    data_new = np.zeros_like(data)
+    for i1 in range(data.shape[0]):
+        for j1 in range(data.shape[1]):
+            index = i1 * data.shape[1] + j1
+            i2 = index % data.shape[0]
+            j2 = index // data.shape[0]
+            data_new[i2, j2] = data[i1, j1]
+    return data_new
+
+
 # Calibratorは自作ライブラリ。Rayleigh, Raman用のデータとフィッティングの関数等が含まれている。
 class RenishawCalibrator(Calibrator):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, keep_ax=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.reader_raw: WDFReader = None
         self.reader_ref: WDFReader = None
 
-        self.map_data: np.ndarray = None
+        self.is_ref_loaded = False
+
+        if not keep_ax:  # reset時にaxを保持するかどうか
+            self.ax = None
 
         self.set_measurement('Raman')
 
     def reset(self):
-        self.__init__()
+        if self.ax is not None:
+            self.ax.cla()
+        self.__init__(keep_ax=True)
 
-    def load_raw(self, filename: str) -> bool:
+    def reset_ref(self):
+        self.reader_ref = None
+        self.is_ref_loaded = False
+
+    def set_ax(self, ax):
+        self.ax = ax
+
+    def load_raw(self, filename: str) -> [bool, MapInfo]:
         # 二次元マッピングファイルを読み込む
         self.reader_raw = WDFReader(filename)
-        self.xdata = self.reader_raw.xdata.copy()
-        self.map_data = self.reader_raw.spectra.copy()
-        map_new = np.zeros_like(self.map_data)
-        for i1 in range(self.map_data.shape[0]):
-            for j1 in range(self.map_data.shape[1]):
-                index = i1 * self.map_data.shape[1] + j1
-                i2 = index % self.map_data.shape[0]
-                j2 = index // self.map_data.shape[0]
-                map_new[i2, j2] = self.map_data[i1, j1]
-        self.map_data = np.array(map_new)
-        if len(self.map_data.shape) == 1:  # 点測定データ
-            self.map_data = self.map_data.reshape(1, 1, -1)
-            # 仮のデータを入れる
-            self.shape = self.map_data.shape[:2]
-            # マッピングの一番右下の座標
-            self.x_start = 0
-            self.y_start = 0
-            # マッピングの1ピクセルあたりのサイズ
-            self.x_pad = 1
-            self.y_pad = 1
-            # マッピングの全体のサイズ
-            self.x_span = 1
-            self.y_span = 1
-            # 空の画像を作る
-            self.img = Image.new('RGB', (1, 1), (200, 200, 200))
-            self.reader_raw.img_origins = (-0.1, -0.1)
-            self.reader_raw.img_dimensions = (1.2, 1.2)
-            return True
-        # 二次元じゃない場合False (x座標) x (y座標) x (スペクトル) の3次元のはず
-        if len(self.map_data.shape) != 3:
-            return False
-        self.shape = self.map_data.shape[:2]
-        # マッピングの一番右下の座標
-        self.x_start = self.reader_raw.map_info['x_start']
-        self.y_start = self.reader_raw.map_info['y_start']
-        # マッピングの1ピクセルあたりのサイズ
-        self.x_pad = self.reader_raw.map_info['x_pad']
-        self.y_pad = self.reader_raw.map_info['y_pad']
-        # マッピングの全体のサイズ
-        self.x_span = self.reader_raw.map_info['x_span']
-        self.y_span = self.reader_raw.map_info['y_span']
-        self.img = Image.open(self.reader_raw.img)
-        return True
+        map_data = self.reader_raw.spectra
+        # 点測定データの場合は3次元にreshapeする
+        if len(map_data.shape) == 1:
+            map_info = MapInfo(
+                xdata=self.reader_raw.xdata,
+                map_data=map_data.reshape(1, 1, -1),
+                shape=(1, 1),
+                map_origin=(0, 0),
+                map_pixel=(1, 1),
+                map_size=(1, 1),
+                img=Image.new('RGB', (1, 1), (200, 200, 200)),
+                img_origin=(-0.1, -0.1),
+                img_size=(1.2, 1.2),
+            )
+            return True, map_info
+        # マップ測定なら(x座標) x (y座標) x (スペクトル) の3次元のはず．そうでなければエラー
+        if len(map_data.shape) != 3:
+            return False, None
+        # WiREのデータはcolumn majorなので、row majorに変換する，MATLABが全て悪い
+        map_data = column_to_row(map_data)
+        map_info = MapInfo(
+            xdata=self.reader_raw.xdata,
+            map_data=map_data,
+            shape=self.reader_raw.spectra.shape[:2],
+            map_origin=(self.reader_raw.map_info['x_start'], self.reader_raw.map_info['y_start']),
+            map_pixel=(self.reader_raw.map_info['x_pad'], self.reader_raw.map_info['y_pad']),
+            map_size=(self.reader_raw.map_info['x_span'], self.reader_raw.map_info['y_span']),
+            img=Image.open(self.reader_raw.img),
+            img_origin=self.reader_raw.img_origins,
+            img_size=self.reader_raw.img_dimensions,
+        )
+        return True, map_info
 
     def load_ref(self, filename: str) -> bool:
         # 標準サンプルのファイルを読み込む
@@ -81,6 +94,7 @@ class RenishawCalibrator(Calibrator):
         if not self.is_xdata_correct():
             return False
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
+        self.is_ref_loaded = True
         return True
 
     def is_xdata_correct(self):
@@ -97,46 +111,20 @@ class RenishawCalibrator(Calibrator):
             raise ValueError('Load data before reset.')
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
 
-    def imshow(self, ax: plt.Axes, map_range: list, cmap: str, cmap_range: list[float], alpha: float) -> None:
-        if self.reader_raw is None:
-            raise ValueError('Load data before imshow.')
-        # マッピングの表示
-        # 光学像の位置、サイズを取り出す
-        img_x0, img_y0 = self.reader_raw.img_origins
-        img_w, img_h = self.reader_raw.img_dimensions
-        extent_optical = (img_x0, img_x0 + img_w, img_y0 + img_h, img_y0)
-        ax.set_xlim(img_x0, img_x0 + img_w)
-        ax.set_ylim(img_y0 + img_h, img_y0)
-        # まずは光学像を描画
-        ax.imshow(self.img, extent=extent_optical)
-        # ラマンマッピングの描画
-        extent_mapping = (self.x_start, self.x_start + self.x_span, self.y_start, self.y_start + self.y_span)
-        map_range_idx = (map_range[0] < self.xdata) & (self.xdata < map_range[1])
-        data = self.map_data[:, :, map_range_idx]
-        if data.shape[2] == 0:
-            return
-        data = np.array([[subtract_baseline(d).sum() for d in dat] for dat in data])
-        # カラーマップ範囲
-        cmap_range = [data.min(), data.max()] if cmap_range is None else cmap_range
-        # 光学像の上にマッピングを描画
-        ax.imshow(data, alpha=alpha, extent=extent_mapping, origin='lower', cmap=cmap, norm=Normalize(vmin=cmap_range[0], vmax=cmap_range[1]))
-
-    def coord2idx(self, x_pos: float, y_pos: float) -> [int, int]:
-        col = round((x_pos - self.x_start) // self.x_pad)
-        row = round((y_pos - self.y_start) // self.y_pad)
-        return row, col
-
-    def idx2coord(self, row: int, col: int) -> [float, float]:
-        return self.x_start + self.x_pad * (col + 0.5), self.y_start + self.y_pad * (row + 0.5)
-
-    def is_inside(self, x: float, y: float) -> bool:
-        # check if the selected position is inside the mapping
-        xmin, xmax = sorted([self.x_start, self.x_start + self.x_span])
-        ymin, ymax = sorted([self.y_start, self.y_start + self.y_span])
-        if (xmin <= x <= xmax) and (ymin <= y <= ymax):
-            return True
+    def plot(self):
+        self.ax.cla()
+        self.ax.autoscale(True)
+        if self.is_calibrated:
+            self.show_result()
         else:
-            return False
+            self.show_spectrum()
+
+    def show_spectrum(self):
+        self.ax.plot(self.xdata, self.ydata, label=self.material, color='k', linewidth=1)
+        self.ax.legend(fontsize=15)
+
+    def show_result(self) -> None:
+        super().show_fit_result(self.ax)
 
     def close(self):
         if self.reader_raw is not None:
