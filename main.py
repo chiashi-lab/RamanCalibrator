@@ -277,7 +277,7 @@ class MainWindow(tk.Frame):
                                               font=('Arial', 30))
         self.canvas_drop_Raman488.create_text(self.width_canvas / 2, self.height_canvas / 2, text='② Reference file',
                                               font=('Arial', 30))
-        self.canvas_drop_Raman488.create_text(self.width_canvas / 2, self.height_canvas * 5 / 6, text='② Reference file',
+        self.canvas_drop_Raman488.create_text(self.width_canvas / 2, self.height_canvas * 5 / 6, text='③ Background file',
                                               font=('Arial', 30))
 
     # 入力のバリデーションの関数，煩雑なのでどうにかしたさある
@@ -709,15 +709,21 @@ class MainWindow(tk.Frame):
             col, row = self.treeview.item(child)['values']
             spectrum = self.map_manager.map_info.map_data[row][col]
             abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
-            if not self.calibrator.is_calibrated:
-                abs_path_ref = ''
-            else:
+            if self.calibrator.is_calibrated:
                 abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
-            # TODO: bg をひいていたらそれも書き込む
+            else:
+                abs_path_ref = ''
+            if self.subtract_bg.get():
+                abs_path_bg = os.path.join(self.folder_bg, self.filename_bg.get())
+            else:
+                abs_path_bg = ''
             filename = os.path.join(folder_to_save, self.construct_filename(ix=col, iy=row))
             with open(filename, 'w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
+                if self.mode == 'Raman488':
+                    f.write(f'# abs_path_bg: {abs_path_bg}\n')
+                    f.write(f'# cosmic_ray_removed: {"Yes" if self.remove_cosmic_ray.get() else "No"}\n')
                 f.write(f'# calibration: {self.calibrator.calibration_info}\n\n')
 
                 for x, y in zip(xdata, spectrum):
