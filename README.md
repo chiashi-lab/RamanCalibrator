@@ -1,23 +1,39 @@
-# RenishawCalibrationGUI
-This application enables us to calibrate the Raman spectra easily which are obtained by Renishaw Raman.
+# About
+Renishaw inVia顕微ラマンで測定した **.wdf** データまたは488Ramanで測定した **.hdf5** データのキャリブレーションができます．\
+488Ramanのデータに関してはバックグラウンドの引き算，宇宙線除去も可能です．
+Python3.10に対応しています．
 
-# Snapshots
-There are some difference depending on os.
-These snapshots are from Mac OS.
-<img width="1251" alt="image" src="https://user-images.githubusercontent.com/92524649/218103243-5a620fae-7a81-4962-a56a-80466ef26db3.png">
-<img width="1287" alt="image" src="https://user-images.githubusercontent.com/92524649/218103575-324a39f4-a033-4f00-b8bf-185f33c89c2d.png">
+# Installation(Windows)
+```commandline
+git clone https://github.com/PlusF/RamanCalibratior.git
+cd RamanCalibratior
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
 
+# 起動
+```commandline
+venv\Scripts\activate
+python main.py
+```
+またはrun.batをダブルクリック
 
 # Usage
-- Drag and drop the .wdf file.
-  - **upper** half of the window: **mapping** data
-  - **lower** half of the window: **reference** data
-- Click the mapping or press arrow keys to check the spectra.
-- Choose the material and dimension for the calibration.
-  - You can choose from ['sulfur', 'naphthalene', 'acetonitrile']
-- Press **CALIBRATE**.
-  - The picked peaks are shown in the graph.
-- Press **ADD** to add data to download.
-  - The added indices are shown in the box.
-  - You can delete it with right click.
-  - When you press **SAVE**, the data will be immediately saved.
+- ファイルをドラッグ&ドロップで読み込みます.
+  - Renishaw
+    - 上： キャリブレーションするデータ
+    - 下： リファレンスデータ
+  - 488Raman（キャリブレーションするデータを読み込むとモードが変わります）
+    - 上： キャリブレーションするデータ
+    - 中： リファレンスデータ
+    - 下： バックグラウンドデータ
+- 画面左のマッピングをクリックまたは矢印キーを押してスペクトルを確認します.
+- キャリブレーションのための参照物質を選択します.
+  - ['sulfur', 'naphthalene', 'acetonitrile']から選択できます.
+- **CALIBRATE**を押します.
+  - キャリブレーションの結果が右下のグラフに表示されます.
+- **ADD**を押してダウンロードするデータを追加します.
+  - 追加したインデックスがボックスに表示されます.
+  - 右クリックで削除できます.
+  - **SAVE**を押すとデータが保存されます.
