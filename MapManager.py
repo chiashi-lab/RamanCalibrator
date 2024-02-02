@@ -29,7 +29,7 @@ class MapManager:
         self.axes_img: matplotlib.image.AxesImage = None
         self.axes_map: matplotlib.image.AxesImage = None
         # RenishawCalibratorから渡される情報
-        self.map_info: MapInfo = None
+        self.map_info: MapInfo
         # マップの横軸範囲
         self.map_range: tuple = (0, 0)
         # マップの横軸範囲のプリセット

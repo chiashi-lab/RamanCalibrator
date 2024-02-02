@@ -10,7 +10,7 @@ from utils import remove_cosmic_ray
 class Raman488DataProcessor:
     def __init__(self, map_info: MapInfo = None):
         self.map_info: MapInfo = map_info
-        self.bg_data: np.ndarray = None
+        self.bg_data: np.ndarray | None = None
 
         if map_info is not None:
             # TODO: thresholdを指定可能に
@@ -45,8 +45,8 @@ class Raman488DataProcessor:
 class Raman488Calibrator(CalibrationManager):
     def __init__(self, *args, keep_ax=False, **kwargs):
         super().__init__(*args, keep_ax=keep_ax, **kwargs)
-        self.reader_raw: RamanHDFReader = None
-        self.reader_ref: RamanHDFReader = None
+        self.reader_raw: RamanHDFReader | None = None
+        self.reader_ref: RamanHDFReader | None = None
 
     def load_raw(self, p: Path) -> [bool, MapInfo]:
         # 二次元マッピングファイルを読み込む

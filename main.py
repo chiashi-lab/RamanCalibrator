@@ -260,15 +260,15 @@ class MainWindow(tk.Frame):
         self.master = master
         self.master.title('Raman Calibrator')
 
-        self.calibrator: CalibrationManager = None
+        self.calibrator: CalibrationManager | None = None
         self.map_manager: MapManager = MapManager()
-        self.processor: Raman488DataProcessor = None
+        self.processor: Raman488DataProcessor | None = None
 
         self.row = self.col = 0
 
-        self.ax_map: plt.Axes = None
-        self.ax_raw: plt.Axes = None
-        self.ax_ref: plt.Axes = None
+        self.ax_map: plt.Axes
+        self.ax_raw: plt.Axes
+        self.ax_ref: plt.Axes
 
         self.line = None
         self.selection_patches = []

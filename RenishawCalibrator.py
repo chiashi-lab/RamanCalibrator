@@ -10,8 +10,8 @@ from utils import column_to_row
 class RenishawCalibrator(CalibrationManager):
     def __init__(self, *args, keep_ax=False, **kwargs):
         super().__init__(*args, keep_ax=keep_ax, **kwargs)
-        self.reader_raw: WDFReader = None
-        self.reader_ref: WDFReader = None
+        self.reader_raw: WDFReader | None = None
+        self.reader_ref: WDFReader | None = None
 
     def load_raw(self, p: Path) -> [bool, MapInfo]:
         # 二次元マッピングファイルを読み込む
