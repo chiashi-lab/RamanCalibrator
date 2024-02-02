@@ -9,11 +9,12 @@ import matplotlib.backend_bases
 from matplotlib import rcParams, patches
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
-from calibrator import Calibrator
+from CalibrationManager import CalibrationManager
 from RenishawCalibrator import RenishawCalibrator
 from Raman488Calibrator import Raman488Calibrator, Raman488DataProcessor
 from MapManager import MapManager
 from MyTooltip import MyTooltip
+from utils import is_num
 
 font_lg = ('Arial', 24)
 font_md = ('Arial', 16)
@@ -61,15 +62,6 @@ def check_ref_loaded(func):
         return func(*args, **kwargs)
 
     return wrapper
-
-
-def is_num(s):
-    try:
-        float(s)
-    except ValueError:
-        return False
-    else:
-        return True
 
 
 class PeakSelector:
@@ -268,7 +260,7 @@ class MainWindow(tk.Frame):
         self.master = master
         self.master.title('Raman Calibrator')
 
-        self.calibrator: Calibrator = None
+        self.calibrator: CalibrationManager = None
         self.map_manager: MapManager = MapManager()
         self.processor: Raman488DataProcessor = None
 
@@ -364,7 +356,7 @@ class MainWindow(tk.Frame):
         label_filename_ref.grid(row=1, column=1)
 
         # frame_calibration
-        c = Calibrator(measurement='Raman')  # リファレンスデータの選択肢を取得するために一時的にCalibratorを作成
+        c = CalibrationManager()  # リファレンスデータの選択肢を取得するために一時的にCalibratorを作成
         self.material = tk.StringVar(value=c.get_material_list()[0])
         self.dimension = tk.StringVar(value=c.get_dimension_list()[0])
         self.function = tk.StringVar(value=c.get_function_list()[0])
@@ -836,7 +828,7 @@ class MainWindow(tk.Frame):
 
     def reset(self) -> None:
         if self.calibrator is not None:
-            self.calibrator.close()  # TODO: calibratorクラスがファイルを管理してるのがよくない
+            self.calibrator.close()
             self.calibrator.reset()
         self.calibrator = None
         if self.processor is not None:
@@ -873,8 +865,8 @@ class MainWindow(tk.Frame):
     @check_map_loaded
     def add_all(self) -> None:
         # 全ての点を保存リストに追加
-        all_indices = [[idx2, idx1] for idx2 in range(self.map_manager.shape[1]) for idx1 in
-                       range(self.map_manager.shape[0])]
+        all_indices = [[idx2, idx1] for idx2 in range(self.map_manager.map_info.shape[1]) for idx1 in
+                       range(self.map_manager.map_info.shape[0])]
         self.treeview.delete(*self.treeview.get_children())
         for index in all_indices:
             self.treeview.insert('', tk.END, text='', values=index)

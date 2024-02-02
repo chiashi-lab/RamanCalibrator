@@ -1,57 +1,17 @@
 from pathlib import Path
-import numpy as np
 from PIL import Image
 from renishawWiRE import WDFReader
-from calibrator import Calibrator
+from CalibrationManager import CalibrationManager
 from MapManager import MapInfo
-
-
-def subtract_baseline(data: np.ndarray):
-    baseline = np.linspace(data[0], data[-1], data.shape[0])
-    return data - baseline
-
-
-def column_to_row(data: np.ndarray):
-    # change data from column major to row major
-    data_new = np.zeros_like(data)
-    for i1 in range(data.shape[0]):
-        for j1 in range(data.shape[1]):
-            index = i1 * data.shape[1] + j1
-            i2 = index % data.shape[0]
-            j2 = index // data.shape[0]
-            data_new[i2, j2] = data[i1, j1]
-    return data_new
+from utils import column_to_row
 
 
 # Calibratorは自作ライブラリ。Rayleigh, Raman用のデータとフィッティングの関数等が含まれている。
-class RenishawCalibrator(Calibrator):
+class RenishawCalibrator(CalibrationManager):
     def __init__(self, *args, keep_ax=False, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, keep_ax=keep_ax, **kwargs)
         self.reader_raw: WDFReader = None
         self.reader_ref: WDFReader = None
-
-        self.is_ref_loaded = False
-
-        if not keep_ax:  # reset時にaxを保持するかどうか
-            self.ax = None
-
-        self.set_measurement('Raman')
-
-    def reset(self):
-        if self.ax is not None:
-            self.ax.cla()
-            self.ax.set_title('Reference Spectrum', fontsize=30)
-        self.__init__(keep_ax=True)
-
-    def reset_ref(self):
-        if self.reader_raw is not None:
-            self.reader_raw.close()
-        self.reader_ref = None
-        self.is_ref_loaded = False
-        self.is_calibrated = False
-
-    def set_ax(self, ax):
-        self.ax = ax
 
     def load_raw(self, p: Path) -> [bool, MapInfo]:
         # 二次元マッピングファイルを読み込む
@@ -100,39 +60,3 @@ class RenishawCalibrator(Calibrator):
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
         self.is_ref_loaded = True
         return True
-
-    def is_xdata_correct(self):
-        if self.reader_raw is None:
-            return True
-        # xdataが同じかどうか確認する
-        if not np.all(self.reader_raw.xdata == self.reader_ref.xdata):
-            return False
-        return True
-
-    def reset_data(self):
-        # キャリブレーションを複数かけることのないよう、毎度リセットをかける
-        if self.reader_raw is None or self.reader_ref is None:
-            raise ValueError('Load data before reset.')
-        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
-
-    def plot(self):
-        self.ax.cla()
-        self.ax.set_title('Reference Spectrum', fontsize=30)
-        self.ax.autoscale(True)
-        if self.is_calibrated:
-            self.show_result()
-        else:
-            self.show_spectrum()
-
-    def show_spectrum(self):
-        self.ax.plot(self.xdata, self.ydata, label=self.material, color='k', linewidth=1)
-        self.ax.legend(fontsize=15)
-
-    def show_result(self) -> None:
-        super().show_fit_result(self.ax)
-
-    def close(self):
-        if self.reader_raw is not None:
-            self.reader_raw.close()
-        if self.reader_ref is not None:
-            self.reader_ref.close()

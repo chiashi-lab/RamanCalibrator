@@ -1,24 +1,10 @@
 from pathlib import Path
 import numpy as np
 from PIL import Image
-from dataloader import RamanHDFReader, RamanHDFWriter
-from calibrator import Calibrator
+from dataloader import RamanHDFReader
+from CalibrationManager import CalibrationManager
 from MapManager import MapInfo
-
-
-def subtract_baseline(data: np.ndarray):
-    baseline = np.linspace(data[0], data[-1], data.shape[0])
-    return data - baseline
-
-
-def remove_cosmic_ray(spectra: np.ndarray, threshold: float):
-    mean = spectra.mean(axis=2)
-    std = spectra.std()
-    deviation = (spectra - mean[:, :, np.newaxis, :]) / std
-    mask = np.where(deviation > threshold, 0, 1)
-    spectra_removed = spectra * mask
-    spectra_average = spectra_removed.sum(axis=2)[:, :, np.newaxis, :] / mask.sum(axis=2)[:, :, np.newaxis, :] * (1 - mask)
-    return spectra_removed + spectra_average
+from utils import remove_cosmic_ray
 
 
 class Raman488DataProcessor:
@@ -56,36 +42,11 @@ class Raman488DataProcessor:
 
 
 # Calibratorは自作ライブラリ。Rayleigh, Raman用のデータとフィッティングの関数等が含まれている。
-class Raman488Calibrator(Calibrator):
+class Raman488Calibrator(CalibrationManager):
     def __init__(self, *args, keep_ax=False, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, keep_ax=keep_ax, **kwargs)
         self.reader_raw: RamanHDFReader = None
         self.reader_ref: RamanHDFReader = None
-
-        self.processor = Raman488DataProcessor()
-
-        self.is_ref_loaded = False
-
-        if not keep_ax:  # reset時にaxを保持するかどうか
-            self.ax = None
-
-        self.set_measurement('Raman')
-
-    def reset(self):
-        if self.ax is not None:
-            self.ax.cla()
-            self.ax.set_title('Reference Spectrum', fontsize=30)
-        self.__init__(keep_ax=True)
-
-    def reset_ref(self):
-        if self.reader_raw is not None:
-            self.reader_raw.close()
-        self.reader_ref = None
-        self.is_ref_loaded = False
-        self.is_calibrated = False
-
-    def set_ax(self, ax):
-        self.ax = ax
 
     def load_raw(self, p: Path) -> [bool, MapInfo]:
         # 二次元マッピングファイルを読み込む
@@ -114,42 +75,7 @@ class Raman488Calibrator(Calibrator):
             print('Warning: Reference file contains multiple spectra. Only the first one is used.')
         if not self.is_xdata_correct():
             return False
-        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra[0][0][0])
+        self.reader_ref.spectra = self.reader_ref.spectra[0][0][0]
+        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
         self.is_ref_loaded = True
         return True
-
-    def is_xdata_correct(self):  # Raman488では意味ないが一応
-        if self.reader_raw is None:
-            return True
-        # xdataが同じかどうか確認する
-        if not np.all(self.reader_raw.xdata == self.reader_ref.xdata):
-            return False
-        return True
-
-    def reset_data(self):
-        # キャリブレーションを複数かけることのないよう、毎度リセットをかける
-        if self.reader_raw is None or self.reader_ref is None:
-            raise ValueError('Load raw data before reset.')
-        self.set_data(self.reader_ref.xdata, self.reader_ref.spectra[0][0][0])
-
-    def plot(self):
-        self.ax.cla()
-        self.ax.set_title('Reference Spectrum', fontsize=30)
-        self.ax.autoscale(True)
-        if self.is_calibrated:
-            self.show_result()
-        else:
-            self.show_spectrum()
-
-    def show_spectrum(self):
-        self.ax.plot(self.xdata, self.ydata, label=self.material, color='k', linewidth=1)
-        self.ax.legend(fontsize=15)
-
-    def show_result(self) -> None:
-        super().show_fit_result(self.ax)
-
-    def close(self):
-        if self.reader_raw is not None:
-            self.reader_raw.close()
-        if self.reader_ref is not None:
-            self.reader_ref.close()
