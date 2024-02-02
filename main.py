@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -27,6 +28,15 @@ plt.rcParams['figure.subplot.top'] = 0.95
 plt.rcParams['figure.subplot.bottom'] = 0.05
 plt.rcParams['figure.subplot.left'] = 0.05
 plt.rcParams['figure.subplot.right'] = 0.95
+
+
+def parse_dnd_files(event: TkinterDnD.DnDEvent) -> [Path]:
+    if event.data[0] == '{':  # {}で区切られていることがある
+        filenames = event.data.split('} {')
+        filenames = list(map(lambda x: x.strip('{}'), filenames))
+    else:
+        filenames = event.data.split()[0]
+    return list(map(Path, filenames))
 
 
 def check_map_loaded(func):
@@ -271,9 +281,9 @@ class MainWindow(tk.Frame):
         self.line = None
         self.selection_patches = []
 
-        self.folder_raw = './'
-        self.folder_ref = './'
-        self.folder_bg = './'
+        self.folder_raw = Path('./')
+        self.folder_ref = Path('./')
+        self.folder_bg = Path('./')
 
         self.mode = 'Renishaw'  # or 'Raman488'
 
@@ -685,14 +695,9 @@ class MainWindow(tk.Frame):
         self.canvas_drop_Renishaw.place_forget()
         self.canvas_drop_Raman488.place_forget()
 
-        # パスによって形式が違う
         # 複数個選択しても1個しか読み込まない
-        if event.data[0] == '{':
-            filename = event.data.split('} {')[0].strip('{').strip('}')
-        else:
-            filename = event.data.split()[0]
-
-        # TODO: pathlibを使う
+        paths = parse_dnd_files(event)
+        filepath = paths[0]
 
         # どこにdropしたかでマッピングファイルなのか、標準サンプルファイルなのか仕分ける
         master_geometry = list(map(int, self.master.winfo_geometry().split('+')[1:]))
@@ -705,26 +710,26 @@ class MainWindow(tk.Frame):
 
         if self.mode == 'Renishaw':
             if dropped_place < threshold:
-                self.load_raw(filename)
+                self.load_raw(filepath)
             else:
-                self.load_ref(filename)
+                self.load_ref(filepath)
         elif self.mode == 'Raman488':
             if dropped_place < threshold * 2 / 3:
-                self.load_raw(filename)
+                self.load_raw(filepath)
             elif dropped_place < threshold * 4 / 3:
-                self.load_ref(filename)
+                self.load_ref(filepath)
             else:
-                self.load_bg(filename)
+                self.load_bg(filepath)
 
-    def load_raw(self, filename: str) -> None:
+    def load_raw(self, filepath: Path) -> None:
         self.reset()
 
-        if filename.split('.')[-1] == 'wdf':
+        if filepath.suffix == '.wdf':
             self.calibrator = RenishawCalibrator()
             self.mode = 'Renishaw'
             self.forget_Raman488_widgets()
             self.peak_selector.close_assign_window()
-        elif filename.split('.')[-1] == 'hdf5':
+        elif filepath.suffix == '.hdf5':
             self.mode = 'Raman488'
             self.calibrator = Raman488Calibrator()
             self.remember_Raman488_widgets()
@@ -733,7 +738,7 @@ class MainWindow(tk.Frame):
             return
 
         self.calibrator.set_ax(self.ax_ref)
-        ok, map_info = self.calibrator.load_raw(filename=filename)
+        ok, map_info = self.calibrator.load_raw(filepath)
         if not ok:
             messagebox.showerror('Error', 'Choose map data.')
             return
@@ -742,53 +747,53 @@ class MainWindow(tk.Frame):
         if self.mode == 'Raman488':
             self.processor = Raman488DataProcessor(map_info=map_info)
 
-        self.filename_raw.set(os.path.basename(filename))
-        self.folder_raw = os.path.dirname(filename)
+        self.filename_raw.set(filepath.name)
+        self.folder_raw = filepath.parent
         self.optionmenu_map_range.config(state=tk.ACTIVE)
         self.optionmenu_map_color.config(state=tk.ACTIVE)
         self.map_manager.clear_and_show()
         self.on_change_cmap_settings()
         self.update_plot()
-        self.tooltip_raw.set(filename)
+        self.tooltip_raw.set(filepath)
 
-    def load_ref(self, filename: str) -> None:
+    def load_ref(self, filepath: Path) -> None:
         if self.calibrator is None:
             messagebox.showerror('Error', 'Choose map data first.')
             return
 
         # ファイル形式を確認
         if self.mode == 'Renishaw':
-            if filename.split('.')[-1] != 'wdf':
+            if filepath.suffix != '.wdf':
                 messagebox.showerror('Error', 'Only .wdf files are acceptable.')
                 return
         elif self.mode == 'Raman488':
-            if filename.split('.')[-1] != 'hdf5':
+            if filepath.suffix != '.hdf5':
                 messagebox.showerror('Error', 'Only .hdf5 files are acceptable.')
                 return
 
         self.calibrator.reset_ref()
-        has_same_xdata = self.calibrator.load_ref(filename)
+        has_same_xdata = self.calibrator.load_ref(filepath)
         if not has_same_xdata:
             messagebox.showerror('Error',
                                  'X-axis data does not match. Choose reference data with same measurement condition as the map data.')
             return
-        self.filename_ref.set(os.path.basename(filename))
-        self.folder_ref = os.path.dirname(filename)
+        self.filename_ref.set(filepath.name)
+        self.folder_ref = filepath.parent
         for material in self.calibrator.get_material_list():
-            if material in filename:
+            if material in filepath.name:
                 self.material.set(material)
         self.button_calibrate.config(state=tk.ACTIVE)
 
         self.peak_selector.reset()
 
         self.show_ref()
-        self.tooltip_ref.set(filename)
+        self.tooltip_ref.set(filepath)
 
-    def load_bg(self, filename) -> None:
-        self.filename_bg.set(os.path.basename(filename))
-        self.folder_bg = os.path.dirname(filename)
-        self.tooltip_bg.set(filename)
-        self.processor.load_bg(filename)
+    def load_bg(self, filepath: Path) -> None:
+        self.filename_bg.set(filepath.name)
+        self.folder_bg = filepath.parent
+        self.tooltip_bg.set(filepath)
+        self.processor.load_bg(filepath)
         self.subtract_bg.set(True)
         self.process()
 
@@ -839,9 +844,9 @@ class MainWindow(tk.Frame):
         self.filename_raw.set('please drag & drop!')
         self.filename_ref.set('please drag & drop!')
         self.filename_bg.set('not loaded')
-        self.folder_raw = './'
-        self.folder_ref = './'
-        self.folder_bg = './'
+        self.folder_raw = Path('./')
+        self.folder_ref = Path('./')
+        self.folder_bg = Path('./')
         self.forget_Raman488_widgets()
         self.button_calibrate.config(state=tk.DISABLED)
         self.row = 0
@@ -900,12 +905,12 @@ class MainWindow(tk.Frame):
         self.update_selection()
 
     def construct_filename(self, ix: int, iy: int) -> str:
-        filename, ext = os.path.splitext(self.filename_raw.get())
+        filepath = Path(self.filename_raw.get())
         ny, nx = self.map_manager.map_info.shape
         # 0埋め
         ix = str(ix).zfill(len(str(nx)))
         iy = str(iy).zfill(len(str(ny)))
-        return f'{filename}_{ix}_{iy}.txt'
+        return filepath.with_name(f'{filepath.stem}_{ix}_{iy}.txt').name
 
     def save(self) -> None:
         # 保存リスト内のファイルを保存
@@ -917,22 +922,26 @@ class MainWindow(tk.Frame):
         folder_to_save = filedialog.askdirectory(initialdir=self.folder_raw)
         if not folder_to_save:
             return
+        folder_to_save = Path(folder_to_save)
 
         xdata = self.map_manager.map_info.xdata
         for child in self.treeview.get_children():
             col, row = self.treeview.item(child)['values']
             spectrum = self.map_manager.map_info.map_data[row][col]
-            abs_path_raw = os.path.join(self.folder_raw, self.filename_raw.get())
+            abs_path_raw = self.folder_raw / self.filename_raw.get()
             if self.calibrator.is_calibrated:
-                abs_path_ref = os.path.join(self.folder_ref, self.filename_ref.get())
+                abs_path_ref = self.folder_ref / self.filename_ref.get()
             else:
                 abs_path_ref = ''
             if self.subtract_bg.get():
-                abs_path_bg = os.path.join(self.folder_bg, self.filename_bg.get())
+                abs_path_bg = self.folder_bg / self.filename_bg.get()
             else:
                 abs_path_bg = ''
-            filename = os.path.join(folder_to_save, self.construct_filename(ix=col, iy=row))
-            with open(filename, 'w') as f:
+            filepath = folder_to_save / self.construct_filename(ix=col, iy=row)
+            if filepath.exists():
+                if not messagebox.askyesno('Confirmation', f'{filepath.name} already exists. Overwrite?'):
+                    continue
+            with filepath.open('w') as f:
                 f.write(f'# abs_path_raw: {abs_path_raw}\n')
                 f.write(f'# abs_path_ref: {abs_path_ref}\n')
                 if self.mode == 'Raman488':

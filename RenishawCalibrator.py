@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 from PIL import Image
 from renishawWiRE import WDFReader
@@ -52,9 +53,9 @@ class RenishawCalibrator(Calibrator):
     def set_ax(self, ax):
         self.ax = ax
 
-    def load_raw(self, filename: str) -> [bool, MapInfo]:
+    def load_raw(self, p: Path) -> [bool, MapInfo]:
         # 二次元マッピングファイルを読み込む
-        self.reader_raw = WDFReader(filename)
+        self.reader_raw = WDFReader(p)
         map_data = self.reader_raw.spectra
         # 点測定データの場合は3次元にreshapeする
         if len(map_data.shape) == 1:
@@ -88,9 +89,9 @@ class RenishawCalibrator(Calibrator):
         )
         return True, map_info
 
-    def load_ref(self, filename: str) -> bool:
+    def load_ref(self, p: Path) -> bool:
         # 標準サンプルのファイルを読み込む
-        self.reader_ref = WDFReader(filename)
+        self.reader_ref = WDFReader(p)
         if len(self.reader_ref.spectra.shape) == 3:  # when choose 2D data for reference
             self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
             print('Warning: Reference file contains multiple spectra. Only the first one is used.')

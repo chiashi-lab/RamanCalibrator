@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 from PIL import Image
 from dataloader import RamanHDFReader, RamanHDFWriter
@@ -34,9 +35,9 @@ class Raman488DataProcessor:
     def reset(self):
         self.__init__()
 
-    def load_bg(self, filename: str) -> None:
+    def load_bg(self, p: Path) -> None:
         # 背景のファイルを読み込む
-        reader_bg = RamanHDFReader(filename)
+        reader_bg = RamanHDFReader(p)
         bg_data = reader_bg.spectra.copy()
         reader_bg.close()
         if bg_data.shape[2] < 3:
@@ -86,9 +87,9 @@ class Raman488Calibrator(Calibrator):
     def set_ax(self, ax):
         self.ax = ax
 
-    def load_raw(self, filename: str) -> [bool, MapInfo]:
+    def load_raw(self, p: Path) -> [bool, MapInfo]:
         # 二次元マッピングファイルを読み込む
-        self.reader_raw = RamanHDFReader(filename)
+        self.reader_raw = RamanHDFReader(p)
         self.xdata = self.reader_raw.xdata.copy()
         map_data_4d = self.reader_raw.spectra  # 宇宙線除去処理のために4次元でとっておく
         map_data = map_data_4d.mean(axis=2).transpose(1, 0, 2)
@@ -106,9 +107,9 @@ class Raman488Calibrator(Calibrator):
         )
         return True, map_info
 
-    def load_ref(self, filename: str) -> bool:
+    def load_ref(self, p: Path) -> bool:
         # 標準サンプルのファイルを読み込む
-        self.reader_ref = RamanHDFReader(filename)
+        self.reader_ref = RamanHDFReader(p)
         if self.reader_ref.spectra.shape[0] > 1 or self.reader_ref.spectra.shape[1] > 1:
             print('Warning: Reference file contains multiple spectra. Only the first one is used.')
         if not self.is_xdata_correct():
