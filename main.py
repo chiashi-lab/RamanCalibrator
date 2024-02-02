@@ -31,7 +31,7 @@ plt.rcParams['figure.subplot.left'] = 0.05
 plt.rcParams['figure.subplot.right'] = 0.95
 
 
-def parse_dnd_files(event: TkinterDnD.DnDEvent) -> [Path]:
+def parse_dnd_files(event) -> [Path]:
     if event.data[0] == '{':  # {}で区切られていることがある
         filenames = event.data.split('} {')
         filenames = list(map(lambda x: x.strip('{}'), filenames))
@@ -684,7 +684,7 @@ class MainWindow(tk.Frame):
         self.update_crosshair()
         self.update_plot()
 
-    def drop(self, event: TkinterDnD.DnDEvent) -> None:
+    def drop(self, event) -> None:
         # ドラッグ&ドロップされたファイルを処理
         # 誘導用の長方形を見えないように
         self.canvas_drop_Renishaw.place_forget()
