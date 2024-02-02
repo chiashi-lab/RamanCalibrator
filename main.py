@@ -584,6 +584,9 @@ class MainWindow(tk.Frame):
         if event.xdata is None or event.ydata is None:
             return
         if event.inaxes == self.ax_map:
+            # ズームモード，移動モードのときは動作しないようにする
+            if self.toolbar._buttons['Zoom'].var.get() or self.toolbar._buttons['Pan'].var.get():
+                return
             self.map_manager.on_click(event.xdata, event.ydata)
             self.update_plot()
         elif event.inaxes == self.ax_ref:  # ピークの矩形選択のため
