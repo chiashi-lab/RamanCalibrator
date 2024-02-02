@@ -2,12 +2,8 @@ import numpy as np
 from PIL import Image
 import matplotlib
 from matplotlib.colors import Normalize
-from dataclasses import dataclass
-
-
-def subtract_baseline(data: np.ndarray):
-    baseline = np.linspace(data[0], data[-1], data.shape[0])
-    return data - baseline
+from dataclasses import dataclass, field
+from utils import subtract_baseline
 
 
 @dataclass
@@ -21,6 +17,9 @@ class MapInfo:  # マッピングの情報をまとめたクラス，複数の�
     img: Image
     img_origin: tuple
     img_size: tuple
+    map_data_4d: np.ndarray = field(default_factory=lambda: np.array([[[[]]]]))
+    map_data_mean: np.ndarray = field(default_factory=lambda: np.array([[[]]]))
+    map_data_crr: np.ndarray = field(default_factory=lambda: np.array([[[]]]))
 
 
 class MapManager:
@@ -30,7 +29,7 @@ class MapManager:
         self.axes_img: matplotlib.image.AxesImage = None
         self.axes_map: matplotlib.image.AxesImage = None
         # RenishawCalibratorから渡される情報
-        self.map_info: MapInfo = None
+        self.map_info: MapInfo
         # マップの横軸範囲
         self.map_range: tuple = (0, 0)
         # マップの横軸範囲のプリセット
@@ -86,6 +85,7 @@ class MapManager:
     def clear_and_show(self) -> None:
         # マップをクリア
         self.ax.cla()
+        self.ax.set_title('Raman Map', fontsize=30)
         # 光学像の表示
         self.show_optical_img()
         # ラマンマッピングの描画
