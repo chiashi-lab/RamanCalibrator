@@ -260,9 +260,9 @@ class MainWindow(tk.Frame):
         self.master = master
         self.master.title('Raman Calibrator')
 
-        self.calibrator: CalibrationManager | None = None
+        self.calibrator: CalibrationManager = CalibrationManager()
         self.map_manager: MapManager = MapManager()
-        self.processor: Raman488DataProcessor | None = None
+        self.processor: Raman488DataProcessor = Raman488DataProcessor()
 
         self.row = self.col = 0
 
@@ -369,10 +369,10 @@ class MainWindow(tk.Frame):
         self.button_assign_manually = ttk.Button(frame_calibration, text='ASSIGN', command=lambda: self.peak_selector.open_assign_window(self), takefocus=False)
         self.frame_assign = None
         self.button_calibrate = ttk.Button(frame_calibration, text='CALIBRATE', command=self.calibrate, state=tk.DISABLED)
-        optionmenu_material.grid(row=0, column=0)
-        optionmenu_dimension.grid(row=0, column=1)
-        optionmenu_function.grid(row=0, column=2)
-        self.button_calibrate.grid(row=1, column=1, columnspan=2)
+        optionmenu_material.grid(row=0, column=0, columnspan=2)
+        optionmenu_dimension.grid(row=1, column=0)
+        optionmenu_function.grid(row=1, column=1)
+        self.button_calibrate.grid(row=2, column=0, columnspan=2)
 
         # frame_download
         self.treeview = ttk.Treeview(frame_download, height=6, selectmode=tk.EXTENDED)
@@ -752,7 +752,7 @@ class MainWindow(tk.Frame):
         self.tooltip_raw.set(filepath)
 
     def load_ref(self, filepath: Path) -> None:
-        if self.calibrator is None:
+        if self.calibrator.reader_raw is None:
             messagebox.showerror('Error', 'Choose map data first.')
             return
 
@@ -818,7 +818,7 @@ class MainWindow(tk.Frame):
 
     def process(self) -> None:
         # バックグラウンド，宇宙線除去
-        if self.subtract_bg.get() and (self.processor is None or self.processor.bg_data is None):
+        if self.subtract_bg.get() and self.processor.bg_data is None:
             messagebox.showerror('Error', 'Choose background data.')
             self.subtract_bg.set(False)
             return
@@ -827,13 +827,10 @@ class MainWindow(tk.Frame):
         self.canvas.draw()
 
     def reset(self) -> None:
-        if self.calibrator is not None:
-            self.calibrator.close()
-            self.calibrator.reset()
-        self.calibrator = None
-        if self.processor is not None:
-            self.processor.reset()
-        self.processor = None
+        self.calibrator.close()
+        self.calibrator.reset()
+        self.calibrator = CalibrationManager()
+        self.processor.reset()
         self.map_manager.reset()
         self.map_manager.map_range = (self.map_range_1.get(), self.map_range_2.get())
         self.filename_raw.set('please drag & drop!')
@@ -948,8 +945,7 @@ class MainWindow(tk.Frame):
                     f.write(f'{x},{y}\n')
 
     def quit(self) -> None:
-        if self.calibrator is not None:
-            self.calibrator.close()
+        self.calibrator.close()
         self.master.quit()
         self.master.destroy()
 
