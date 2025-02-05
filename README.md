@@ -5,7 +5,7 @@ Python3.10に対応しています．
 
 # Installation(Windows)
 ```commandline
-git clone https://github.com/PlusF/RamanCalibratior.git
+git clone https://github.com/chiashi-lab/RamanCalibratior.git
 cd RamanCalibratior
 python -m venv venv
 venv\Scripts\activate
