@@ -1,5 +1,5 @@
-git+https://github.com/PlusF/Calibrator
-git+https://github.com/PlusF/DataLoader
+git+https://github.com/chiashi-lab/Calibrator
+git+https://github.com/chiashi-lab/DataLoader
 numpy
 pillow
 matplotlib

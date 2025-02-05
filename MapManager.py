@@ -220,8 +220,8 @@ class MapManager:
     def update_crosshair(self) -> None:
         # マッピング上のクロスヘアを移動
         x, y = self.idx2coord(self.row, self.col)
-        self.horizontal_line.set_ydata(y)
-        self.vertical_line.set_xdata(x)
+        self.horizontal_line.set_ydata([y, y])
+        self.vertical_line.set_xdata([x, x])
 
         if self.show_crosshair:
             self.horizontal_line.set_visible(True)
