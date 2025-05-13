@@ -56,7 +56,12 @@ class RenishawCalibrator(CalibrationManager):
             self.reader_ref.spectra = self.reader_ref.spectra[0][0]  # TODO: allow user to choose
             print('Warning: Reference file contains multiple spectra. Only the first one is used.')
         if not self.is_xdata_correct():
-            return False
+            if self.calc_xdata_diff() > 0.1:
+                print('Warning: Xdata of raw and reference data are not the same.')
+                print('Please check the calibration.')
+                return False
+            print('Warning: Xdata of raw and reference data are not the same.')
+            print('The difference is less than 0.1 cm-1. Proceeding with calibration.')
         self.set_data(self.reader_ref.xdata, self.reader_ref.spectra)
         self.is_ref_loaded = True
         return True
