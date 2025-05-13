@@ -48,6 +48,10 @@ class CalibrationManager(Calibrator):
             return False
         return True
 
+    def calc_xdata_diff(self):
+        diff = np.mean(np.abs(self.reader_raw.xdata - self.reader_ref.xdata))
+        return  diff
+
     def reset_data(self):
         # キャリブレーションを複数かけることのないよう、毎度リセットをかける
         if self.reader_raw is None or self.reader_ref is None:
